@@ -1,357 +1,436 @@
 <div align="center">
 
-# VibeSignal
+# VibeSignal (Matter + OpenCode fork)
 
-**A physical USB status light for AI coding agents (Claude Code, Codex)**
+**An ambient status light for AI coding agents: Claude Code, Codex, and OpenCode.
+Drive a USB busylight, an on-screen widget, or a Matter smart bulb.**
 
-[![PyPI](https://img.shields.io/pypi/v/vibesignal.svg)](https://pypi.org/project/vibesignal/)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
-[![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#whats-next)
-[![GitHub Stars](https://img.shields.io/github/stars/yzhao062/vibesignal?style=social)](https://github.com/yzhao062/vibesignal)
+[![Status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#limitations)
 
-[Install](#install) · [Quickstart](#quickstart) · [How It Works](#how-it-works) · [Three Renderers](#three-renderers) · [Configure Agents](#configure-agents) · [What's Next](#whats-next)
+[What it does](#what-it-does) · [Install](#install) · [Setup paths](#choose-a-setup-path) · [Colors & themes](#colors-themes-and-brightness) · [How it works](#how-it-works) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
 
 </div>
 
 > [!NOTE]
-> **The light is the point.** When Claude Code or Codex needs your reply, a USB light on your desk turns amber. When an agent finishes its turn, it turns blue. While an agent is working, green. A light on the desk is harder to miss than one more notification in the corner of a screen you are already ignoring.
+> This is a fork of **[VibeSignal](https://github.com/yzhao062/vibesignal)** by
+> [Yue Zhao](https://github.com/yzhao062). The hook layer, session store, priority
+> resolver, USB light support, terminal panel, and floating widget are upstream work.
+> This fork adds Matter smart-bulb support, an OpenCode plugin, and configurable
+> colors and themes. `pip install vibesignal` installs the **upstream** package, which
+> has none of these additions; install from this checkout instead (see [Install](#install)).
 
-No light on your desk yet? The same signal renders on screen, so you can run VibeSignal today and add the hardware later. The always-on-top widget below stays calm grey while agents work, and turns red the moment a session blocks for your input.
+## What it does
 
-<p align="center">
-<img src="https://raw.githubusercontent.com/yzhao062/vibesignal/main/docs/widget-mockup.png" alt="The VibeSignal widget mirrors the desk light on screen: a calm grey panel while agents work, turning red when a session blocks for your input" width="760">
-</p>
+When you run several coding agents at once, the agent that needs you is usually in a
+terminal you aren't looking at. Desktop notifications pile up and are easy to ignore.
+VibeSignal puts the answer in your peripheral vision: one light shows the most urgent
+state across every live session.
 
-## What You Get
+| State | Default color | Meaning |
+|---|---|---|
+| `blocked` | 🔴 red `#DC2626` | An agent is waiting on you (permission prompt or question) |
+| `error` | 🟣 violet `#9333EA` | A session failed |
+| `done` | 🔵 blue `#005AFF` | An agent finished its turn; your move |
+| `working` | 🟢 green `#00C83C` | Agents are busy; leave them alone |
+| `idle` | off | Nothing live |
 
-- 🟢 **Solid colors, daemon-free:** the state persists in the hardware after the hook exits; no service to keep alive
-- 🪝 **Hook-driven:** `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`, `SessionEnd` all wire in via JSON
-- 🤖 **Cross-agent:** the same store covers Claude Code and Codex; one light tracks both
-- 📺 **Three renderers:** USB busylight (hardware), terminal watch panel, always-on-top Tk widget
-- 🚦 **Multi-session aware:** runs 4–5 agents in parallel; the widget shows which one is blocked
-- 🖱️ **One-click on macOS and Windows:** `install-launcher` + `install-autostart` wire a native launcher and login autostart (`.app` + LaunchAgent on macOS; Start menu, Desktop, and Startup shortcuts on Windows)
-- 🪟 **Cross-platform:** Windows, macOS, Linux; per-platform fonts and work-area detection
+With several sessions, the highest priority wins: **`blocked > error > done > working > idle`**.
+If one agent is blocked while four others work, the light is red.
+
+### What this fork adds
+
+- **Matter smart bulb.** A small persistent worker mirrors the aggregate state to any
+  Matter Extended Color Light through a local [matter.js Matter Server](https://github.com/matter-js/matterjs-server)
+  (pinned in `matter-server/package.json`).
+  Hooks never talk to the bulb, so they stay fast, and the worker turns the bulb off
+  when sessions expire even if no further hook fires.
+- **OpenCode.** `install-hooks --agent opencode` installs a dependency-free global
+  OpenCode plugin. Delegated sub-agent sessions are ignored so they can't override
+  their parent chat. Codex also gets `SessionEnd`, so a closed chat clears at once.
+- **Configurable colors and themes.** Change any state color, apply a built-in theme
+  (default, calm, warm, cool), and share mappings as small versioned JSON files. The
+  USB light, widget, and bulb all read the same mapping.
+- **Constant bulb brightness.** One brightness setting for every active state. State
+  and theme changes only change hue and saturation.
 
 ## Install
 
-```bash
-pip install vibesignal
-```
+Requirements: **Python 3.11+**. The Matter path also needs **Node.js 22.13+**
+(for the pinned `matter-server` 1.4.0 runtime).
 
-On macOS, add the `macos` extra for accurate Dock-aware widget placement:
-
-```bash
-pip install 'vibesignal[macos]'
-```
-
-<details>
-<summary>Install the latest unreleased build from GitHub</summary>
+Clone this repository, then install it in editable mode from the checkout. Editable
+mode matters for Matter: `install-matter-autostart` runs the Node runtime from the
+checkout's `matter-server/` directory.
 
 ```bash
-pip install 'vibesignal @ git+https://github.com/yzhao062/vibesignal.git'
-
-# with the macOS extra:
-pip install 'vibesignal[macos] @ git+https://github.com/yzhao062/vibesignal.git'
+git clone <this-repository-url> vibesignal
+cd vibesignal
+python3 -m venv .venv
+.venv/bin/pip install -e '.[matter]'
 ```
 
-</details>
-
-The [Quickstart](#quickstart) below wires the one-click launcher and login autostart on macOS and Windows. On Linux, add a `.desktop` entry under `~/.config/autostart/` that runs `vibesignal widget`, then [configure your agents](#configure-agents) to fire the hooks.
-
-## Quickstart
-
-Only the install line differs by OS; the setup commands are the same. Wire the Claude Code hooks once (see [Configure Agents](#configure-agents)), then:
-
-**1. Install** (macOS adds the `macos` extra for accurate Dock-aware widget placement):
+Optional extras: `macos` (native widget placement and always-on-top behavior) and
+`dev` (pytest). Combine them as needed, for example `-e '.[matter,macos,dev]'`.
+With [uv](https://docs.astral.sh/uv/):
 
 ```bash
-pip install 'vibesignal[macos]'   # macOS
-pip install vibesignal            # Windows
+uv venv .venv --python 3.11
+uv pip install --python .venv/bin/python -e '.[matter,macos,dev]'
 ```
 
-**2. Set up** (identical on macOS and Windows):
+The commands below write `vibesignal`; use `.venv/bin/vibesignal` if the venv isn't
+activated. `install-hooks` pins the absolute path of the `vibesignal` you run it with,
+so the agents find this install even when their hook shell has a different `PATH`.
+
+## Choose a setup path
+
+Every path starts with the agent hooks; the renderers are independent and can be
+combined.
+
+### 1. Agent hooks (required)
 
 ```bash
-vibesignal install-hooks       # wire agent hooks (absolute path pinned; add --agent codex for Codex)
-vibesignal install-launcher    # macOS: Spotlight-able .app; Windows: Start menu + Desktop shortcut
-vibesignal install-autostart   # starts the widget now and at every login
-vibesignal status              # verify: active sessions + resolved color
+vibesignal install-hooks                    # Claude Code -> ~/.claude/settings.json
+vibesignal install-hooks --agent codex      # Codex       -> ~/.codex/hooks.json
+vibesignal install-hooks --agent opencode   # OpenCode    -> ~/.config/opencode/plugins/vibesignal.js
 ```
 
-After `install-autostart`, a small panel appears in the bottom-left of your screen. When any session blocks for permission, the panel turns red and shows which session.
+Existing hooks are preserved, and re-running is idempotent (it also re-pins the path
+after you move or recreate the venv). Then:
 
-<details>
-<summary><b>macOS daily lifecycle</b> (show or quit the widget, autostart controls)</summary>
+- **Claude Code:** takes effect in the next session.
+- **Codex:** trust the new hooks once via `/hooks`, then restart Codex.
+- **OpenCode:** restart OpenCode so it loads the plugin.
 
-| Action | Command |
+| Agent | `working` | `blocked` | `done` | `error` | session closed |
+|---|---|---|---|---|---|
+| Claude Code | `UserPromptSubmit`, `PostToolUse` | `Notification` (`permission_prompt`) | `Stop`, `StopFailure`, `Notification` (`idle_prompt`) | manual only | `SessionEnd` |
+| Codex | `UserPromptSubmit`, `PostToolUse` | `PermissionRequest` | `Stop` | manual only | `SessionEnd` |
+| OpenCode | `session.status` busy, permission/question replied | `permission.asked`, `question.asked` | `session.idle` | `session.error` | `session.deleted` |
+
+Remove hooks with `vibesignal uninstall-hooks [--agent codex|opencode]`. To wire
+Claude Code or Codex by hand, see [`hooks/`](hooks/) and
+[`hooks/codex-hooks.md`](hooks/codex-hooks.md).
+
+Check that events arrive without any hardware:
+
+```bash
+vibesignal event --agent claude --state blocked --session demo
+vibesignal status        # aggregate state, color, per-session rows, Matter status
+vibesignal clear         # forget all sessions
+```
+
+### 2. USB busylight
+
+Plug in a light supported by [`busylight-core`](https://pypi.org/project/busylight-core/)
+(for example Luxafor Flag or blink(1)). There is nothing else to configure: every hook
+event sets the light directly and exits. With no light connected, hooks still record
+state and exit cleanly. USB support is unchanged upstream functionality and has not
+been re-tested on hardware in this fork.
+
+### 3. Screen widget or terminal panel
+
+```bash
+vibesignal widget &              # always-on-top floating panel (macOS / Linux)
+pythonw -m vibesignal widget     # Windows, no console window
+vibesignal watch                 # live table in a terminal pane
+```
+
+On macOS and Windows, `vibesignal install-launcher` adds a launcher (Spotlight `.app`
+or Start menu and Desktop shortcuts) and `vibesignal install-autostart` starts the
+widget at login. On Linux, add a `~/.config/autostart/` entry that runs
+`vibesignal widget`. The widget takes on the blocked or error color when any session
+needs you, and right-click (or Control-click) quits it.
+
+### 4. Matter smart bulb (macOS)
+
+You need a Matter-over-Wi-Fi color bulb, the Mac and bulb on the same LAN/subnet
+(Matter discovery is link-local), and an existing Matter controller (for example
+Apple Home) to provide a sharing code.
+
+**Install the runtime and start the services.** This installs two launchd agents: the
+Matter Server (local only, `127.0.0.1:5580`) and the `matter-sync` worker. Both start
+now and at every login and are restarted if they exit.
+
+```bash
+npm install --prefix matter-server
+vibesignal install-matter-autostart --interface en0   # your primary network interface
+```
+
+**Commission the bulb.** On macOS the standalone server cannot commission over
+Bluetooth, so add the bulb to Apple Home first, choose *Turn On Pairing Mode* in the
+accessory's settings, then commission the already-networked bulb into VibeSignal's
+fabric:
+
+```bash
+vibesignal matter-commission          # prompts for the sharing code without echoing it
+vibesignal matter-nodes               # confirm the node is listed
+vibesignal matter-config --brightness 15
+vibesignal status                     # "matter: color=... error=none"
+```
+
+`matter-commission` selects the new node (endpoint 1 by default; pass `--endpoint` if
+your bulb uses another). To select an existing node instead, run
+`vibesignal matter-config --node <id> --endpoint <n>`. The Matter dashboard is at
+<http://127.0.0.1:5580>.
+
+Manage the services:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-sync     # restart the worker
+launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-server   # restart the server
+vibesignal uninstall-matter-autostart
+```
+
+Logs go to `~/.vibesignal/io.github.yzhao062.vibesignal.matter-{server,sync}.{log,err}`.
+
+On Linux the Matter path has not been tested. In principle you can run the server
+(`node matter-server/node_modules/matter-server/dist/esm/MatterServer.js --storage-path ~/.vibesignal/matter-server --listen-address 127.0.0.1`)
+and `vibesignal matter-sync` under your own service manager.
+
+## Colors, themes, and brightness
+
+Colors apply to every renderer: the USB light, the widget, and the Matter bulb. `idle`
+is always off and can't be assigned a color. `vibesignal config` with no option shows
+the effective settings.
+
+### Individual colors
+
+```bash
+vibesignal config --show
+vibesignal config --color working '#00C83C'
+vibesignal config --color blocked '#FF4400' --color done '#0088FF'   # several at once
+vibesignal config --reset-colors
+```
+
+States are `working`, `blocked`, `done`, and `error`. Colors are 6-digit hex, with or
+without `#` (quote them in the shell). Changing one state keeps the others. Unknown
+states, malformed hex, and `#000000` are rejected with an explanation, and nothing is
+changed. Black is rejected because a bulb takes only hue and saturation from a color,
+so black would light up white.
+
+### Themes
+
+```bash
+vibesignal config --list-themes
+vibesignal config --theme calm
+vibesignal config --color error '#C026D3'   # individual overrides still work afterward
+```
+
+A theme writes all four colors in one atomic update. `--show` reports the theme name
+while the mapping matches it exactly, and `custom` after an override.
+
+<p align="center"><img src="docs/themes.svg" alt="Theme preview: default, calm, warm, and cool palettes for the working, blocked, done, and error states" width="720"></p>
+
+| Theme | `working` | `blocked` | `done` | `error` |
+|---|---|---|---|---|
+| `default` | `#00C83C` green | `#DC2626` red | `#005AFF` blue | `#9333EA` violet |
+| `calm` | `#6DBE8C` sage | `#E07A72` coral | `#6F9EE0` soft blue | `#A88BDB` lavender |
+| `warm` | `#E8C000` gold | `#DB1F4A` rose red | `#F2661B` orange | `#A3179E` magenta |
+| `cool` | `#14B8A6` teal | `#EC4899` pink | `#3B82F6` blue | `#8B5CF6` indigo |
+
+In every theme, the four states are at least 25° apart in hue and keep enough
+saturation to read as distinct colors on a bulb. `warm` is the tightest, because
+gold and orange sit close together.
+
+### Import and export
+
+```bash
+vibesignal config --export-colors ./desk-colors.json
+vibesignal config --import-colors ./desk-colors.json
+```
+
+Exports contain the effective colors, including individual overrides:
+
+```json
+{
+  "schema_version": 1,
+  "colors": {
+    "working": "#00C83C",
+    "blocked": "#DC2626",
+    "done": "#005AFF",
+    "error": "#9333EA"
+  }
+}
+```
+
+An import must include `schema_version: 1` and all four states. VibeSignal validates
+the whole file before applying it. An unsupported version, an extra key, an unknown
+state, `idle`, or an invalid color rejects the file and leaves the current colors
+untouched. Files contain only colors: imports and themes never change brightness or
+Matter connection settings.
+
+### Bulb brightness
+
+```bash
+vibesignal matter-config --brightness 12
+```
+
+`--brightness` is a whole-number percentage from 1 to 100. Every active state uses the
+same level. The level comes only from this setting, never from how light or dark a
+state's color is, so state and theme changes alter hue and saturation only. Idle
+turns the bulb off. A fresh install defaults to 100%; most people will want something
+much lower on a desk.
+
+`matter-config` changes only the flags you pass. The others are `--url`, `--node`,
+`--clear-node`, `--endpoint`, and `--transition` (in tenths of a second, default 3).
+
+### Where settings live and when they apply
+
+Everything lives in `~/.vibesignal/` (override with `VIBECODING_SIGNAL_DIR`):
+
+| Path | Contents |
 |---|---|
-| Show widget on demand | Cmd+Space → `VibeSignal` → Enter (Spotlight); or `vibesignal widget &` |
-| Quit widget window | Right-click or `Control`-click header → Quit |
-| Force-kill a running widget | `pkill -f "vibesignal.widget"` |
-| Start the LaunchAgent right now (no relogin) | `launchctl kickstart gui/$UID/io.github.yzhao062.vibesignal` |
-| Disable autostart, keep launcher | `vibesignal uninstall-autostart` |
-| Re-enable autostart later | `vibesignal install-autostart` (idempotent) |
-| Remove the `.app` launcher | `vibesignal uninstall-launcher` |
-| Inspect autostart status | `launchctl print gui/$UID/io.github.yzhao062.vibesignal` |
-| Tail autostart logs | `tail /tmp/io.github.yzhao062.vibesignal.log /tmp/io.github.yzhao062.vibesignal.err` |
-| Wire/re-pin agent hooks (idempotent) | `vibesignal install-hooks` (add `--agent codex` for Codex) |
-| Remove agent hooks | `vibesignal uninstall-hooks` (add `--agent codex` for Codex) |
-| Re-pin paths after switching conda env | `vibesignal install-autostart && vibesignal install-hooks` |
-| Manually clear stuck sessions | `vibesignal clear` (all) or `vibesignal clear --session <id>` |
+| `colors.json` | Color mapping, same format as an export (absent means defaults) |
+| `matter.json` | Matter server URL, node, endpoint, transition, brightness |
+| `sessions/` | One small JSON file per live agent session |
+| `matter_status.json`, `last_color.json` | Last applied colors and Matter errors, for `status` |
+| `matter-server/` | Matter fabric storage, **including pairing credentials; never share it** |
 
-</details>
+Changes apply live:
 
-<details>
-<summary><b>Windows daily lifecycle</b> (show or quit the widget, autostart controls)</summary>
+- **Matter worker:** re-reads `colors.json` and `matter.json` about twice a second, so
+  color, theme, import, and brightness changes reach the bulb without a restart.
+- **Widget:** picks up color changes on its next refresh (about one second).
+- **USB light:** `vibesignal config` re-applies the light immediately. Otherwise it
+  changes on the next hook event.
+- **Terminal panel (`watch`):** uses fixed basic ANSI colors that approximate the
+  default hues, because 24-bit color isn't reliable across terminals.
 
-| Action | Command |
-|---|---|
-| Show widget on demand | Start menu → type `VibeSignal`; or the Desktop shortcut; or `pythonw -m vibesignal widget` |
-| Quit widget window | Right-click the header → Quit |
-| Disable autostart, keep launcher | `vibesignal uninstall-autostart` |
-| Re-enable autostart later | `vibesignal install-autostart` (idempotent) |
-| Remove the launcher shortcuts | `vibesignal uninstall-launcher` |
-| Re-pin paths after switching conda env | `vibesignal install-autostart` |
-| Manually clear stuck sessions | `vibesignal clear` (all) or `vibesignal clear --session <id>` |
+### Upgrading from the pulse version
 
-</details>
+Earlier builds of this fork used `max_brightness_pct`, `steady_brightness_pct`, and
+`priority_pulse_seconds` (a brief peak on priority increases). These were replaced by
+the single `brightness_pct`, and old files are migrated when read:
 
-## How It Works
+1. A valid `brightness_pct` is used as is.
+2. Otherwise, a valid steady brightness is kept, capped at the old maximum.
+3. Otherwise, the old maximum is used (100 if absent).
+4. Pulse settings are ignored.
 
-Every hook invocation does the full cycle and exits. Nothing has to stay running.
+For example, max 20 / steady 12 / pulse 0.6 becomes 12%. Server URL, node, endpoint,
+transition, and unknown keys are preserved. The file is rewritten in the new format
+the next time you run `vibesignal matter-config` (with or without flags). The
+migration is repeatable and doesn't depend on that rewrite. The old
+`--max-brightness`, `--steady-brightness`, and `--priority-pulse-seconds` flags are
+gone.
+
+> [!IMPORTANT]
+> After upgrading, restart the running worker (`launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-sync`).
+> A worker still running the old code doesn't understand `brightness_pct`. Once
+> `matter.json` has been rewritten, the old worker would fall back to 100%.
+
+## How it works
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {
-  'primaryColor': '#dbeafe', 'primaryTextColor': '#1e3a8a',
-  'primaryBorderColor': '#3b82f6', 'lineColor': '#475569',
-  'fontFamily': 'system-ui', 'fontSize': '13px'
-}}}%%
 flowchart LR
-    H["Claude Code / Codex hook"] --> C["vibesignal event<br/>--agent X --state Y"]
-    C --> S[("~/.vibesignal/<br/>sessions/*.json")]
-    S --> L["USB busylight"]
-    S --> P["Watch panel"]
-    S --> W["Floating widget"]
+    H["Agent hooks / OpenCode plugin"] -->|"vibesignal event / end"| S[("~/.vibesignal/sessions/*.json")]
+    C[("colors.json")] --> R
+    S --> R["resolve: per-state TTL + priority"]
+    R -->|"in the hook process"| L["USB busylight"]
+    R --> P["watch panel / widget"]
+    R --> M["matter-sync worker"] -->|"WebSocket"| MS["Matter Server"] --> B["Matter bulb"]
+    MC[("matter.json")] --> M
 ```
 
-Each hook fires `vibesignal event`, which writes one JSON file per (agent, session), reads every active file, resolves the aggregate state by priority (`blocked > error > done > working > idle`), and updates the USB light if the color changed. Sessions that stop emitting events drop off after their per-state TTL.
+- **Hooks are short-lived.** Each event atomically writes one per-session file, resolves
+  the aggregate under a bounded cross-process lock, sets the USB light if the color
+  changed, and exits. A VibeSignal failure never fails the agent's hook.
+- **One worker owns the bulb.** Network I/O stays out of hooks. `matter-sync` polls the
+  store, and when the resolved (color, config) pair changes it sends a Level Control
+  command (`moveToLevelWithOnOff`, from the brightness setting) and a Color Control
+  command (`moveToHueAndSaturation`, from the state color), or `off` for idle. Failed
+  sends are retried every 5 seconds and reported by `vibesignal status`.
+- **Lifetimes.** Hooks only refresh a session when something happens, so each state
+  expires on its own clock: `done` after 90 s, `error` after 5 min, silent `working`
+  after 10 min, and `blocked` at an 8 h crash backstop. A state change, a session-end
+  event, or `vibesignal clear` removes it sooner. Expiry is computed at read time, so
+  the worker turns the bulb off on expiry without any new event.
+- **Colors are separate from logic.** State names, aliases (`needs_input` → `blocked`),
+  priorities, and lifetimes live in `resolve.py`. `colors.py` maps states to colors and
+  is read tolerantly: a corrupt `colors.json` falls back to defaults per state.
 
-Concurrent hooks stay honest two ways. The record-resolve-apply cycle holds a short cross-process lock, so two sessions firing at once cannot leave the light on a lower-priority color (a finishing `working` hook overwriting a fresh `blocked` event from another session). Every state file is written atomically (`tempfile` plus `os.replace`), so a reader never sees a half-written file. The lock is bounded: if it cannot be taken quickly it gives up and proceeds, because never blocking the agent's hook matters more than perfect ordering under rare contention.
+See [DESIGN.md](DESIGN.md) for the design history and rationale.
 
-## State Table
+## Tested with
 
-| State | Light | Set by (Claude Code hook) | Meaning |
-|-------|-------|---------------------------|---------|
-| `blocked` | Amber, solid | `Notification` (`permission_prompt`) | An agent needs you now |
-| `done` | Blue, solid | `Stop`, `StopFailure`, `Notification` (`idle_prompt`) | An agent finished its turn; your move |
-| `working` | Green, solid | `UserPromptSubmit`, `PostToolUse` | An agent is busy, do not interrupt |
-| `error` | Red, solid | Manual only | A failure |
-| `idle` | Off | TTL timeout, done-fade | Nothing needs you |
+| Component | Tested |
+|---|---|
+| Matter bulb | Linkind ST19 (AiDot) Matter-over-Wi-Fi color bulb, first commissioned in Apple Home |
+| Matter host | macOS with launchd, Node.js 22, `matter-server` 1.4.0 |
+| Agents | Claude Code, Codex, OpenCode |
+| Core, widget, installers | Upstream CI on Windows, macOS, and Linux, Python 3.11–3.13 |
+| USB lights | Upstream support through `busylight-core`; not re-tested in this fork |
 
-Aggregate priority across active sessions: `blocked > error > done > working > idle`. If any one agent is waiting on you, the light is amber, so the signal you care about most is never hidden.
+Other Matter color bulbs should work if they expose the standard On/Off, Level Control,
+and Color Control (hue/saturation) clusters. Reports are welcome.
 
-## Three Renderers
+## Troubleshooting
 
-| Renderer | Command | Where It Lives |
-|---|---|---|
-| 🟢 **USB busylight** | Driven automatically by every `event` call | Physical light on the desk |
-| 📋 **Watch panel** | `vibesignal watch` | Live multi-session TUI in a terminal pane |
-| 🪟 **Floating widget** | `vibesignal widget` | Always-on-top Tk window |
+| Symptom | Check |
+|---|---|
+| Nothing changes | Run `vibesignal status` while an agent works. No sessions means the hooks aren't firing: re-run `install-hooks`, restart the agent, and for Codex trust them via `/hooks`. |
+| `status` shows `matter: ... error=...` | The worker can't reach the server or bulb. Check the server log in `~/.vibesignal/`, open <http://127.0.0.1:5580>, and run `vibesignal matter-nodes`. |
+| Commissioning times out | The Mac and bulb must be on the same subnet. Use a fresh sharing code from Apple Home. Check `--interface` (`en0` is usually Wi-Fi on laptops). |
+| Bulb is wrong after a power cut or manual change | The worker only sends on changes. Restart it (`launchctl kickstart -k …matter-sync`) to re-apply now. |
+| Bulb too bright or dim | `vibesignal matter-config --brightness N`, applied live. |
+| Colors look different on the bulb | Bulbs render hue and saturation with their own LEDs. Adjust per state with `config --color`. |
+| A stale session pins the light | `vibesignal clear` (all) or `vibesignal clear --session <id>`. |
+| `colors.json` edited by hand and ignored | `vibesignal config --show` prints a warning naming the problem. |
 
-All three read the same state store, so they stay in sync. The widget shows which session is blocked when several agents run at once. The USB light shows the highest-priority state across all sessions.
+## Limitations
 
-### Watch Panel
+This is an experimental personal project shared for feedback:
+
+- Matter autostart is macOS-only (launchd). The Matter path is tested with one bulb
+  model.
+- The worker doesn't notice when the bulb is power-cycled or changed from another app
+  until the next state change or a worker restart.
+- Hue accuracy depends on the bulb. Pastel (low-saturation) colors look whiter on some
+  bulbs.
+- The OpenCode plugin depends on OpenCode's event names, which may change between
+  releases.
+- `error` is detected automatically only for OpenCode (`session.error`). For Claude Code
+  and Codex, set it manually with `vibesignal event --agent <name> --state error`.
+- One aggregate light per bulb. There is no per-session multi-bulb or LED-strip mapping
+  yet.
+
+## Development
 
 ```bash
-vibesignal watch
+.venv/bin/pip install -e '.[matter,dev]'
+.venv/bin/python -m pytest -q
 ```
 
-Live table, one row per active session, blocked rows first:
+Tests mock all Matter I/O and USB devices and run against a temporary state directory,
+so they never touch your real `~/.vibesignal` or bulb. The Tk widget render test skips
+when no Tk display is available.
 
-```
-  PROJECT          AGENT    STATE      FOR
-* aegis            claude   * blocked  1m12s
-* agent-audit      codex    * blocked  8s
-o iet-paper        claude   o done     3s
-. random           claude   . working  --
-```
+Layout: `store.py` (session files, atomic writes) · `resolve.py` (states, priority,
+lifetimes) · `colors.py` (color mapping, themes, import/export) · `light.py` (USB) ·
+`matter.py` (Matter client and worker) · `panel.py` / `widget.py` (screen renderers) ·
+`installer.py` (hooks, launchers, autostart) · `__main__.py` (CLI).
 
-Foreground viewer (Ctrl-C to stop), not a daemon. `vibesignal watch --once` renders a single snapshot.
+## Contributing
 
-### Floating Widget
+Feedback and collaboration are welcome, especially:
 
-Cross-platform Tk panel, always-on-top, draggable by the header. Right-click to quit; on macOS, `Control`-click also opens the Quit menu.
+- results with other Matter bulbs (model, firmware, and how each theme looks),
+- Linux or Windows service setups for the Matter worker,
+- agent integrations and hook mappings for other tools,
+- better palettes. Keep the four states clearly distinguishable on real hardware.
 
-The panel re-asserts its always-on-top level on every refresh, because macOS drops a borderless window behind other apps when they activate. Install the `macos` extra (`pip install 'vibesignal[macos]'`) for the sturdier native path: it pins the window to a floating level and lets it follow you across Spaces, and it also gives the accurate Dock-aware placement.
+Please open an issue on this repository with your setup and `vibesignal status`
+output (it contains no credentials). Pull requests should include tests (`pytest -q`
+passes) and keep hooks fast and non-blocking. Ideas that fit upstream VibeSignal
+itself are best proposed [upstream](https://github.com/yzhao062/vibesignal).
 
-```bash
-# macOS: open via Spotlight ("VibeSignal") after install-launcher, or:
-vibesignal widget &
+## Credits and license
 
-# Windows (no console window):
-pythonw -m vibesignal widget
-
-# Linux:
-vibesignal widget &
-```
-
-The widget pins to the bottom-left of the work area on first launch, then becomes draggable. A `done` row fades after about 90 seconds, a silent `working` row clears after 10 minutes, and `blocked` or `error` rows persist until the state changes or the 8-hour backstop expires.
-
-## Configure Agents
-
-### Claude Code
-
-The one-command path (recommended):
-
-```bash
-vibesignal install-hooks
-```
-
-This merges the six hook entries into `~/.claude/settings.json` under `"hooks"`, preserves any hooks you already have, and **pins the absolute path** of the `vibesignal` you ran it with. Pinning is the whole point: Claude Code runs each hook command in a short-lived shell whose `PATH` need not include the environment vibesignal is installed in (a conda env on macOS is the classic trap), so a bare `vibesignal` would fail with `command not found` and nothing would ever record. Re-run after switching env to re-pin; `vibesignal uninstall-hooks` removes them again.
-
-To wire it by hand instead, merge [`hooks/claude-settings.snippet.json`](hooks/claude-settings.snippet.json) into `~/.claude/settings.json` under `"hooks"` and **replace the bare `vibesignal` with its absolute path** (`which vibesignal`). The keys (`UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`, `StopFailure`, `SessionEnd`) do not collide with any default hooks. `Notification` is split by matcher: `permission_prompt` sets `blocked`, `idle_prompt` sets `done`. `SessionEnd` clears the session at once instead of waiting out the TTL. The snippet's commands already pass `--quiet` so hook stdout stays empty for strict parsers.
-
-The `vibesignal` command reads the session id from the hook's stdin JSON, so one light tracks every concurrent session.
-
-> [!TIP]
-> `PostToolUse` returns the light to green after you approve a mid-task permission prompt, at the cost of one quick call per tool use. Drop it if you prefer zero per-tool overhead; the light then stays amber until the turn ends.
-
-### Codex
-
-The state store is agent-agnostic: events carry an `--agent` tag, so one light covers Claude Code and Codex at once. Wire Codex the same one-command way:
-
-```bash
-vibesignal install-hooks --agent codex   # writes ~/.codex/hooks.json, absolute path pinned
-```
-
-Then trust the new hooks once via `/hooks` in a Codex session and restart it. Codex uses its own hook vocabulary — `PermissionRequest` for the blocked signal (Claude uses `Notification`), and no `SessionEnd`, so a closed Codex session ages out by its TTL rather than clearing at once.
-
-To wire it by hand instead, merge [`hooks/codex-hooks.snippet.json`](hooks/codex-hooks.snippet.json) into `~/.codex/hooks.json` and trust via `/hooks`; the commands use `--quiet` because Codex hook types can parse stdout as JSON. If the hook shell cannot find `vibesignal`, use the absolute interpreter form, e.g. `C:/Users/<you>/miniforge3/envs/py312/python.exe -m vibesignal`. For older Codex (completion-only fallback), run [`hooks/codex-notify.py`](hooks/codex-notify.py) with the Python interpreter that has VibeSignal installed and point `~/.codex/config.toml` at it:
-
-```toml
-notify = [
-  'C:\Users\<you>\miniforge3\envs\py312\python.exe',
-  'C:\path\to\vibesignal\hooks\codex-notify.py',
-]
-```
-
-See [`hooks/codex-hooks.md`](hooks/codex-hooks.md) for the event mapping and version notes.
-
-## Test Without Hardware
-
-The light arrives later than the code does, so the whole pipeline is observable without a device:
-
-```bash
-vibesignal event --agent claude --state working
-vibesignal event --agent claude --state working --quiet  # hook-safe, no stdout
-vibesignal status        # active sessions and the resolved color
-vibesignal off           # clear all sessions
-```
-
-With no light connected, `event` records state and prints the color it would set, then exits cleanly. Hooks never fail when the light is missing or unplugged.
-
-## Hardware
-
-There is no purpose-built "AI agent light" product. The proven path is a commercial presence light plus the open-source [`busylight-core`](https://pypi.org/project/busylight-core/) library, which supports many USB lights across multiple vendors.
-
-| Light | Form | Notes |
-|---|---|---|
-| **Luxafor Flag 2** | Magnet on a monitor edge, USB-C | Eye-level spot, holds its color |
-| **blink(1) mk2** | Tiny, fully open | Long-standing developer favorite |
-
-Both are on Amazon US and supported by `busylight-core`. Check the live price before buying.
-
-<details>
-<summary><b>Why Solid Colors, Not Blinking</b></summary>
-
-Blinking a USB light needs a process that stays alive to drive the blink, which would mean a daemon. Solid colors persist in the light hardware after the process exits, so they fit the daemon-free design. Amber solid is still very visible.
-
-This assumes a light that holds its last state (Luxafor, blink(1), BlinkStick). Kuando-style lights that need a constant connection would require the daemon mode even for solid colors.
-
-</details>
-
-<details>
-<summary><b>Per-State Lifetimes</b></summary>
-
-- **`done`** fades after ~90 seconds (a transient "your move" pulse)
-- **`working`** clears after 10 minutes of silence (a silent working session is treated as dead)
-- **`blocked`** and **`error`** persist for up to 8 hours: nothing refreshes them while they wait on you, and a shorter TTL would drop a long-pending prompt exactly when it is most overdue. Cleared sooner when you act on it, when the session ends, or by `vibesignal clear`.
-
-The 8-hour backstop only self-cleans a hard-crashed session that left no final event.
-
-</details>
-
-<details>
-<summary><b>Launcher and Autostart Internals (macOS + Windows)</b></summary>
-
-The same two subcommands wire up native paths on each OS, with no new package dependency:
-
-```bash
-vibesignal install-launcher      # macOS .app / Windows Start menu + Desktop shortcut
-vibesignal uninstall-launcher
-vibesignal install-autostart     # macOS LaunchAgent / Windows Startup shortcut; starts now + every login
-vibesignal uninstall-autostart
-```
-
-**macOS** compiles an AppleScript `.app` via `osacompile` into `~/Applications/VibeSignal.app` (Spotlight-able, draggable to the Dock), and writes `~/Library/LaunchAgents/io.github.yzhao062.vibesignal.plist` with the absolute path of `vibesignal` baked in (so LaunchAgent's empty PATH is not an issue), loaded via `launchctl bootstrap gui/<uid>`.
-
-**Windows** writes `VibeSignal.lnk` shortcuts through the stock PowerShell `WScript.Shell` COM object: Start menu plus Desktop for the launcher, and the Startup folder for autostart. The shortcut runs `pythonw -m vibesignal widget` so there is no console window, and `[Environment]::GetFolderPath` resolves the Startup / Programs / Desktop folders correctly even when the Desktop is redirected into OneDrive.
-
-On both systems the widget starts immediately on `install-autostart` and at every future login. Re-run `install-autostart` after switching env to re-pin the interpreter path.
-
-The work area is detected per platform: `SPI_GETWORKAREA` on Windows (taskbar excluded); `NSScreen.visibleFrame` on macOS (menu bar and Dock excluded), with a 28 / 80 px heuristic fallback when `pyobjc` is absent; full screen on Linux. The fallback assumes a bottom Dock; install the `macos` extra for accurate placement under any Dock orientation.
-
-Fonts: `Segoe UI` on Windows, `Helvetica Neue` on macOS, `DejaVu Sans` elsewhere.
-
-</details>
-
-<details>
-<summary><b>Project Layout</b></summary>
-
-```
-vibesignal/
-|-- README.md
-|-- DESIGN.md
-|-- LICENSE
-|-- pyproject.toml
-|-- vibesignal/
-|   |-- __init__.py
-|   |-- store.py        # per-session state files + TTL + atomic writes + last-color cache
-|   |-- resolve.py      # aggregate + per-session resolution -> colors
-|   |-- light.py        # busylight wrapper, no-ops without a device
-|   |-- lock.py         # bounded cross-process lock for the event critical section
-|   |-- panel.py        # live multi-session TUI panel (foreground viewer)
-|   |-- widget.py       # always-on-top floating GUI panel (Tkinter, stdlib)
-|   |-- installer.py    # macOS .app + LaunchAgent / Windows .lnk launcher + autostart
-|   |-- __main__.py     # CLI invoked by hooks
-|-- hooks/
-|   |-- claude-settings.snippet.json
-|   |-- codex-hooks.snippet.json
-|   |-- codex-hooks.md
-|   |-- codex-notify.py
-|-- tests/
-    |-- test_resolve.py
-    |-- test_store.py
-    |-- test_lock.py
-    |-- test_main.py
-    |-- test_panel.py
-    |-- test_widget.py
-    |-- test_installer.py
-    |-- test_hooks.py
-```
-
-</details>
-
-## What's Next
-
-> [!NOTE]
-> Recently shipped: one-click Windows setup (`install-launcher` / `install-autostart`), PyPI packaging (`pip install vibesignal`), and a GitHub Actions CI matrix (Windows / macOS / Linux, Python 3.11 to 3.13).
-
-- **Homebrew tap** at `yzhao062/homebrew-tap` for `brew install yzhao062/tap/vibesignal`
-- **Multi-LED strip** support: a BlinkStick Strip with one cell per session (the store already keys by session; needs a `session -> cell` map in `resolve.py`)
-- **Daemon mode (opt-in)** for blinking patterns and auto-off after idle, at the cost of a service to keep alive
-
-## License
+VibeSignal was created by [Yue Zhao](https://github.com/yzhao062)
+([upstream repository](https://github.com/yzhao062/vibesignal)). This fork's additions
+are distributed under the same terms.
 
 [BSD 2-Clause](LICENSE) © 2026 Yue Zhao

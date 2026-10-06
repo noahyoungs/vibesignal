@@ -1,8 +1,9 @@
 """Physical status light for coding agents.
 
-A daemon-free bridge: agent hooks report per-session state to a small file store,
-the aggregate state is resolved by priority, and a USB busylight is set to the
-matching solid color. See README.md for the design.
+Agent hooks report per-session state to a small file store, the aggregate state is
+resolved by priority, and renderers show the matching color: a USB busylight (set
+directly by hooks), screen viewers, and an optional persistent Matter bulb worker.
+See README.md and DESIGN.md.
 """
 
 from .resolve import State, resolve_color

@@ -245,3 +245,12 @@ def test_cli_removed_pulse_flags_are_rejected(state_dir):
             cli.main(["matter-config", flag, "10"])
         assert exc.value.code == 2
 
+
+def test_readme_theme_preview_matches_builtin_themes():
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    svg = (root / "docs" / "themes.svg").read_text(encoding="utf-8")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    for theme in colors.THEMES.values():
+        for value in theme.values():
+            assert value in svg and value in readme
