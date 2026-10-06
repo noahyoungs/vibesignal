@@ -1,33 +1,32 @@
 <div align="center">
 
-# VibeSignal (Matter + OpenCode fork)
+# VibeSignal for Matter
 
-**An ambient status light for AI coding agents: Claude Code, Codex, and OpenCode.
-Drive a USB busylight, an on-screen widget, or a Matter smart bulb.**
+**Turn a Matter smart bulb into an ambient status light for your AI coding agents:
+Claude Code, Codex, and OpenCode.**
 
 [![CI](https://github.com/noahyoungs/vibesignal/actions/workflows/ci.yml/badge.svg)](https://github.com/noahyoungs/vibesignal/actions/workflows/ci.yml)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
 [![Status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#limitations)
 
-[What it does](#what-it-does) · [Install](#install) · [Setup paths](#choose-a-setup-path) · [Colors & themes](#colors-themes-and-brightness) · [How it works](#how-it-works) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
+[What it does](#what-it-does) · [Install](#install) · [Set up the bulb](#set-up-the-bulb) · [Connect your agents](#connect-your-agents) · [Colors & themes](#colors-themes-and-brightness) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
 
 </div>
 
 > [!NOTE]
-> This is a fork of **[VibeSignal](https://github.com/yzhao062/vibesignal)** by
-> [Yue Zhao](https://github.com/yzhao062). The hook layer, session store, priority
-> resolver, USB light support, terminal panel, and floating widget are upstream work.
-> This fork adds Matter smart-bulb support, an OpenCode plugin, and configurable
-> colors and themes. `pip install vibesignal` installs the **upstream** package, which
-> has none of these additions; install from this checkout instead (see [Install](#install)).
+> This is a Matter-focused fork of **[VibeSignal](https://github.com/yzhao062/vibesignal)**
+> by [Yue Zhao](https://github.com/yzhao062), which drives USB busylights and an
+> on-screen widget. If you want one of those instead of a smart bulb, use
+> [upstream VibeSignal](https://github.com/yzhao062/vibesignal). This fork keeps that
+> support too (see [Other displays](#other-displays)).
 
 ## What it does
 
-When you run several coding agents at once, the agent that needs you is usually in a
-terminal you aren't looking at. Desktop notifications pile up and are easy to ignore.
-VibeSignal puts the answer in your peripheral vision: one light shows the most urgent
-state across every live session.
+When you run several coding agents at once, the one that needs you is usually in a
+terminal you aren't looking at, and desktop notifications are easy to ignore. VibeSignal
+puts the answer in your peripheral vision: a smart bulb on your desk shows the most
+urgent state across every live agent session.
 
 | State | Default color | Meaning |
 |---|---|---|
@@ -38,65 +37,110 @@ state across every live session.
 | `idle` | off | Nothing live |
 
 With several sessions, the highest priority wins: **`blocked > error > done > working > idle`**.
-If one agent is blocked while four others work, the light is red.
+If one agent is blocked while four others work, the bulb is red.
 
-### What this fork adds
+Highlights:
 
-- **Matter smart bulb.** A small persistent worker mirrors the aggregate state to any
-  Matter Extended Color Light through a local [matter.js Matter Server](https://github.com/matter-js/matterjs-server)
-  (pinned in `matter-server/package.json`).
-  Hooks never talk to the bulb, so they stay fast, and the worker turns the bulb off
-  when sessions expire even if no further hook fires.
-- **OpenCode.** `install-hooks --agent opencode` installs a dependency-free global
-  OpenCode plugin. Delegated sub-agent sessions are ignored so they can't override
-  their parent chat. Codex also gets `SessionEnd`, so a closed chat clears at once.
-- **Configurable colors and themes.** Change any state color, apply a built-in theme
-  (default, calm, warm, cool), and share mappings as small versioned JSON files. The
-  USB light, widget, and bulb all read the same mapping.
-- **Constant bulb brightness.** One brightness setting for every active state. State
-  and theme changes only change hue and saturation.
+- **Any Matter color bulb**, driven through a local [matter.js Matter Server](https://github.com/matter-js/matterjs-server)
+  (pinned in `matter-server/package.json`). One small worker owns the bulb, so agent
+  hooks stay fast, and the bulb turns off by itself when sessions expire.
+- **Claude Code, Codex, and OpenCode** (1.x and 2.x, including OpenChamber), installed
+  with one command each. Sub-agent sessions can't override their parent chat.
+- **Colors and themes:** change any state color, pick a built-in theme (default, calm,
+  warm, cool), and share mappings as small JSON files.
+- **Constant brightness:** one brightness level for every state. State and theme changes
+  only change the hue.
 
 ## Install
 
-Requirements: **Python 3.11+**. The Matter path also needs **Node.js 22.13+**
-(for the pinned `matter-server` 1.4.0 runtime).
+Requirements: **macOS**, **Python 3.11+**, and **Node.js 22.13+** (for the pinned
+`matter-server` 1.4.0 runtime).
 
-Clone this repository, then install it in editable mode from the checkout. Editable
-mode matters for Matter: `install-matter-autostart` runs the Node runtime from the
-checkout's `matter-server/` directory.
+Clone the repository and install it in editable mode. The Matter services run the Node
+runtime from the checkout's `matter-server/` directory, so keep the checkout where it is.
 
 ```bash
 git clone https://github.com/noahyoungs/vibesignal.git vibesignal
 cd vibesignal
 python3 -m venv .venv
 .venv/bin/pip install -e '.[matter]'
+npm install --prefix matter-server
 ```
 
-Optional extras: `macos` (native widget placement and always-on-top behavior) and
-`dev` (pytest). Combine them as needed, for example `-e '.[matter,macos,dev]'`.
-With [uv](https://docs.astral.sh/uv/):
+With [uv](https://docs.astral.sh/uv/), replace the last three lines with:
 
 ```bash
 uv venv .venv --python 3.11
-uv pip install --python .venv/bin/python -e '.[matter,macos,dev]'
+uv pip install --python .venv/bin/python -e '.[matter]'
+npm install --prefix matter-server
 ```
 
 The package is named `vibesignal-matter` so it can't be confused with upstream's
-`vibesignal` on PyPI; the command and Python module are still `vibesignal`. If you
-previously installed upstream into the same environment, `pip uninstall vibesignal`
-first. For USB or widget use without Matter, a non-editable install also works:
-`pip install 'vibesignal-matter @ git+https://github.com/noahyoungs/vibesignal.git'`.
+`vibesignal` on PyPI; the command and Python module are still `vibesignal`. If upstream
+is installed in the same environment, `pip uninstall vibesignal` first.
 
 The commands below write `vibesignal`; use `.venv/bin/vibesignal` if the venv isn't
-activated. `install-hooks` pins the absolute path of the `vibesignal` you run it with,
-so the agents find this install even when their hook shell has a different `PATH`.
+activated.
 
-## Choose a setup path
+## Set up the bulb
 
-Every path starts with the agent hooks; the renderers are independent and can be
-combined.
+You need a Matter-over-Wi-Fi color bulb, the Mac and bulb on the same LAN/subnet
+(Matter discovery is link-local), and an existing Matter controller (for example Apple
+Home) to provide a sharing code.
 
-### 1. Agent hooks (required)
+**1. Start the services.** This installs two launchd agents: the Matter Server (local
+only, `127.0.0.1:5580`) and the `matter-sync` worker that drives the bulb. Both start
+now and at every login, and restart if they exit.
+
+```bash
+vibesignal install-matter-autostart --interface en0   # your primary network interface
+```
+
+**2. Commission the bulb.** On macOS the standalone server can't commission over
+Bluetooth, so add the bulb to Apple Home first, choose *Turn On Pairing Mode* in the
+accessory's settings, then commission the already-networked bulb into VibeSignal's
+fabric:
+
+```bash
+vibesignal matter-commission          # prompts for the sharing code without echoing it
+vibesignal matter-nodes               # confirm the node is listed
+```
+
+`matter-commission` selects the new node (endpoint 1 by default; pass `--endpoint` if
+your bulb uses another). To select an existing node instead, run
+`vibesignal matter-config --node <id> --endpoint <n>`. The Matter dashboard is at
+<http://127.0.0.1:5580>.
+
+**3. Set a comfortable brightness** (a fresh install uses 100%):
+
+```bash
+vibesignal matter-config --brightness 15
+```
+
+**4. Check it.** This fakes a blocked agent, so the bulb should turn red within a
+second, and off again after the clear:
+
+```bash
+vibesignal event --agent claude --state blocked --session demo
+vibesignal status        # aggregate state, per-session rows, "matter: ... error=none"
+vibesignal clear
+```
+
+Manage the services:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-sync     # restart the worker
+launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-server   # restart the server
+vibesignal uninstall-matter-autostart
+```
+
+Logs go to `~/.vibesignal/io.github.yzhao062.vibesignal.matter-{server,sync}.{log,err}`.
+
+On Linux the Matter path hasn't been tested. In principle you can run the server
+(`node matter-server/node_modules/matter-server/dist/esm/MatterServer.js --storage-path ~/.vibesignal/matter-server --listen-address 127.0.0.1`)
+and `vibesignal matter-sync` under your own service manager.
+
+## Connect your agents
 
 ```bash
 vibesignal install-hooks                    # Claude Code -> ~/.claude/settings.json
@@ -104,12 +148,13 @@ vibesignal install-hooks --agent codex      # Codex       -> ~/.codex/hooks.json
 vibesignal install-hooks --agent opencode   # OpenCode    -> ~/.config/opencode/plugins/vibesignal.js
 ```
 
-Existing hooks are preserved, and re-running is idempotent (it also re-pins the path
-after you move or recreate the venv). Then:
+Existing hooks are preserved, and re-running is safe. `install-hooks` pins the absolute
+path of the `vibesignal` you run it with, so agents find it even when their hook shell
+has a different `PATH`; re-run it if you move or recreate the venv. Then:
 
 - **Claude Code:** takes effect in the next session.
 - **Codex:** trust the new hooks once via `/hooks`, then restart Codex.
-- **OpenCode:** restart OpenCode so it loads the plugin.
+- **OpenCode / OpenChamber:** restart it so it loads the plugin.
 
 | Agent | `working` | `blocked` | `done` | `error` | session closed |
 |---|---|---|---|---|---|
@@ -126,87 +171,10 @@ Remove hooks with `vibesignal uninstall-hooks [--agent codex|opencode]`. To wire
 Claude Code or Codex by hand, see [`hooks/`](hooks/) and
 [`hooks/codex-hooks.md`](hooks/codex-hooks.md).
 
-Check that events arrive without any hardware:
-
-```bash
-vibesignal event --agent claude --state blocked --session demo
-vibesignal status        # aggregate state, color, per-session rows, Matter status
-vibesignal clear         # forget all sessions
-```
-
-### 2. USB busylight
-
-Plug in a light supported by [`busylight-core`](https://pypi.org/project/busylight-core/)
-(for example Luxafor Flag or blink(1)). There is nothing else to configure: every hook
-event sets the light directly and exits. With no light connected, hooks still record
-state and exit cleanly. USB support is unchanged upstream functionality and has not
-been re-tested on hardware in this fork.
-
-### 3. Screen widget or terminal panel
-
-```bash
-vibesignal widget &              # always-on-top floating panel (macOS / Linux)
-pythonw -m vibesignal widget     # Windows, no console window
-vibesignal watch                 # live table in a terminal pane
-```
-
-On macOS and Windows, `vibesignal install-launcher` adds a launcher (Spotlight `.app`
-or Start menu and Desktop shortcuts) and `vibesignal install-autostart` starts the
-widget at login. On Linux, add a `~/.config/autostart/` entry that runs
-`vibesignal widget`. The widget takes on the blocked or error color when any session
-needs you, and right-click (or Control-click) quits it.
-
-### 4. Matter smart bulb (macOS)
-
-You need a Matter-over-Wi-Fi color bulb, the Mac and bulb on the same LAN/subnet
-(Matter discovery is link-local), and an existing Matter controller (for example
-Apple Home) to provide a sharing code.
-
-**Install the runtime and start the services.** This installs two launchd agents: the
-Matter Server (local only, `127.0.0.1:5580`) and the `matter-sync` worker. Both start
-now and at every login and are restarted if they exit.
-
-```bash
-npm install --prefix matter-server
-vibesignal install-matter-autostart --interface en0   # your primary network interface
-```
-
-**Commission the bulb.** On macOS the standalone server cannot commission over
-Bluetooth, so add the bulb to Apple Home first, choose *Turn On Pairing Mode* in the
-accessory's settings, then commission the already-networked bulb into VibeSignal's
-fabric:
-
-```bash
-vibesignal matter-commission          # prompts for the sharing code without echoing it
-vibesignal matter-nodes               # confirm the node is listed
-vibesignal matter-config --brightness 15
-vibesignal status                     # "matter: color=... error=none"
-```
-
-`matter-commission` selects the new node (endpoint 1 by default; pass `--endpoint` if
-your bulb uses another). To select an existing node instead, run
-`vibesignal matter-config --node <id> --endpoint <n>`. The Matter dashboard is at
-<http://127.0.0.1:5580>.
-
-Manage the services:
-
-```bash
-launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-sync     # restart the worker
-launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-server   # restart the server
-vibesignal uninstall-matter-autostart
-```
-
-Logs go to `~/.vibesignal/io.github.yzhao062.vibesignal.matter-{server,sync}.{log,err}`.
-
-On Linux the Matter path has not been tested. In principle you can run the server
-(`node matter-server/node_modules/matter-server/dist/esm/MatterServer.js --storage-path ~/.vibesignal/matter-server --listen-address 127.0.0.1`)
-and `vibesignal matter-sync` under your own service manager.
-
 ## Colors, themes, and brightness
 
-Colors apply to every renderer: the USB light, the widget, and the Matter bulb. `idle`
-is always off and can't be assigned a color. `vibesignal config` with no option shows
-the effective settings.
+`vibesignal config` with no option shows the effective settings. `idle` is always off
+and can't be assigned a color.
 
 ### Individual colors
 
@@ -244,8 +212,8 @@ while the mapping matches it exactly, and `custom` after an override.
 | `cool` | `#14B8A6` teal | `#EC4899` pink | `#3B82F6` blue | `#8B5CF6` indigo |
 
 In every theme, the four states are at least 25° apart in hue and keep enough
-saturation to read as distinct colors on a bulb. `warm` is the tightest, because
-gold and orange sit close together.
+saturation to read as distinct colors on a bulb. `warm` is the tightest, because gold
+and orange sit close together.
 
 ### Import and export
 
@@ -274,7 +242,7 @@ state, `idle`, or an invalid color rejects the file and leaves the current color
 untouched. Files contain only colors: imports and themes never change brightness or
 Matter connection settings.
 
-### Bulb brightness
+### Brightness
 
 ```bash
 vibesignal matter-config --brightness 12
@@ -282,14 +250,13 @@ vibesignal matter-config --brightness 12
 
 `--brightness` is a whole-number percentage from 1 to 100. Every active state uses the
 same level. The level comes only from this setting, never from how light or dark a
-state's color is, so state and theme changes alter hue and saturation only. Idle
-turns the bulb off. A fresh install defaults to 100%; most people will want something
-much lower on a desk.
+state's color is, so state and theme changes alter hue and saturation only. Idle turns
+the bulb off.
 
 `matter-config` changes only the flags you pass. The others are `--url`, `--node`,
 `--clear-node`, `--endpoint`, and `--transition` (in tenths of a second, default 3).
 
-### Where settings live and when they apply
+### Where settings live
 
 Everything lives in `~/.vibesignal/` (override with `VIBECODING_SIGNAL_DIR`):
 
@@ -298,58 +265,26 @@ Everything lives in `~/.vibesignal/` (override with `VIBECODING_SIGNAL_DIR`):
 | `colors.json` | Color mapping, same format as an export (absent means defaults) |
 | `matter.json` | Matter server URL, node, endpoint, transition, brightness |
 | `sessions/` | One small JSON file per live agent session |
-| `matter_status.json`, `last_color.json` | Last applied colors and Matter errors, for `status` |
+| `matter_status.json` | Last color sent to the bulb and any Matter error, for `status` |
 | `matter-server/` | Matter fabric storage, **including pairing credentials; never share it** |
 
-Changes apply live:
-
-- **Matter worker:** re-reads `colors.json` and `matter.json` about twice a second, so
-  color, theme, import, and brightness changes reach the bulb without a restart.
-- **Widget:** picks up color changes on its next refresh (about one second).
-- **USB light:** `vibesignal config` re-applies the light immediately. Otherwise it
-  changes on the next hook event.
-- **Terminal panel (`watch`):** uses fixed basic ANSI colors that approximate the
-  default hues, because 24-bit color isn't reliable across terminals.
-
-### Upgrading from the pulse version
-
-Earlier builds of this fork used `max_brightness_pct`, `steady_brightness_pct`, and
-`priority_pulse_seconds` (a brief peak on priority increases). These were replaced by
-the single `brightness_pct`, and old files are migrated when read:
-
-1. A valid `brightness_pct` is used as is.
-2. Otherwise, a valid steady brightness is kept, capped at the old maximum.
-3. Otherwise, the old maximum is used (100 if absent).
-4. Pulse settings are ignored.
-
-For example, max 20 / steady 12 / pulse 0.6 becomes 12%. Server URL, node, endpoint,
-transition, and unknown keys are preserved. The file is rewritten in the new format
-the next time you run `vibesignal matter-config` (with or without flags). The
-migration is repeatable and doesn't depend on that rewrite. The old
-`--max-brightness`, `--steady-brightness`, and `--priority-pulse-seconds` flags are
-gone.
-
-> [!IMPORTANT]
-> After upgrading, restart the running worker (`launchctl kickstart -k gui/$(id -u)/io.github.yzhao062.vibesignal.matter-sync`).
-> A worker still running the old code doesn't understand `brightness_pct`. Once
-> `matter.json` has been rewritten, the old worker would fall back to 100%.
+The worker re-reads `colors.json` and `matter.json` about twice a second, so color,
+theme, import, and brightness changes reach the bulb without a restart.
 
 ## How it works
 
 ```mermaid
 flowchart LR
     H["Agent hooks / OpenCode plugin"] -->|"vibesignal event / end"| S[("~/.vibesignal/sessions/*.json")]
+    S --> R["resolve: per-state lifetime + priority"]
     C[("colors.json")] --> R
-    S --> R["resolve: per-state TTL + priority"]
-    R -->|"in the hook process"| L["USB busylight"]
-    R --> P["watch panel / widget"]
     R --> M["matter-sync worker"] -->|"WebSocket"| MS["Matter Server"] --> B["Matter bulb"]
     MC[("matter.json")] --> M
 ```
 
-- **Hooks are short-lived.** Each event atomically writes one per-session file, resolves
-  the aggregate under a bounded cross-process lock, sets the USB light if the color
-  changed, and exits. A VibeSignal failure never fails the agent's hook.
+- **Hooks are short-lived.** Each agent event atomically writes one per-session file
+  under a bounded cross-process lock and exits. A VibeSignal failure never fails the
+  agent's hook.
 - **One worker owns the bulb.** Network I/O stays out of hooks. `matter-sync` polls the
   store, and when the resolved (color, config) pair changes it sends a Level Control
   command (`moveToLevelWithOnOff`, from the brightness setting) and a Color Control
@@ -360,11 +295,22 @@ flowchart LR
   after 10 min, and `blocked` at an 8 h crash backstop. A state change, a session-end
   event, or `vibesignal clear` removes it sooner. Expiry is computed at read time, so
   the worker turns the bulb off on expiry without any new event.
-- **Colors are separate from logic.** State names, aliases (`needs_input` → `blocked`),
-  priorities, and lifetimes live in `resolve.py`. `colors.py` maps states to colors and
-  is read tolerantly: a corrupt `colors.json` falls back to defaults per state.
 
 See [DESIGN.md](DESIGN.md) for the design history and rationale.
+
+## Other displays
+
+Everything from upstream VibeSignal still works in this fork and follows the same colors:
+
+- **USB busylights** supported by [`busylight-core`](https://pypi.org/project/busylight-core/)
+  (for example Luxafor Flag or blink(1)) are set directly by every hook event.
+- **On-screen widget:** `vibesignal widget &` (add the `macos` extra on macOS), plus
+  `install-launcher` and `install-autostart`.
+- **Terminal panel:** `vibesignal watch`.
+
+They aren't the focus here and haven't been re-tested in this fork. If you don't have a
+Matter bulb, [upstream VibeSignal](https://github.com/yzhao062/vibesignal) documents
+them in full and is the better starting point.
 
 ## Tested with
 
@@ -373,8 +319,6 @@ See [DESIGN.md](DESIGN.md) for the design history and rationale.
 | Matter bulb | Linkind ST19 (AiDot) Matter-over-Wi-Fi color bulb, first commissioned in Apple Home |
 | Matter host | macOS with launchd, Node.js 22, `matter-server` 1.4.0 |
 | Agents | Claude Code 2.1, Codex 0.151, OpenCode 1.18 and 2.0.18 (bundled by OpenChamber) |
-| Core, widget, installers | Upstream CI on Windows, macOS, and Linux, Python 3.11–3.13 |
-| USB lights | Upstream support through `busylight-core`; not re-tested in this fork |
 
 Other Matter color bulbs should work if they expose the standard On/Off, Level Control,
 and Color Control (hue/saturation) clusters. Reports are welcome.
@@ -404,13 +348,12 @@ This is an experimental personal project shared for feedback:
   bulbs.
 - One OpenCode plugin file serves 1.x and 2.x. OpenCode 2.x's plugin API is new and
   undocumented, so event names may change; its `blocked` mapping (`permission.asked`)
-  has not been verified live, and 2.x questions/forms are not mapped yet.
+  hasn't been verified live, and 2.x questions/forms aren't mapped yet.
 - Detecting a denied Claude Code permission prompt relies on Claude's transcript
   format (a `system`/`turn_duration` entry), which isn't a documented interface.
-- `error` is detected automatically only for OpenCode (`session.error`). For Claude Code
-  and Codex, set it manually with `vibesignal event --agent <name> --state error`.
-- One aggregate light per bulb. There is no per-session multi-bulb or LED-strip mapping
-  yet.
+- `error` is detected automatically only for OpenCode. For Claude Code and Codex, set it
+  manually with `vibesignal event --agent <name> --state error`.
+- One aggregate state per bulb. There's no per-session multi-bulb mapping yet.
 
 ## Development
 
@@ -420,13 +363,12 @@ This is an experimental personal project shared for feedback:
 ```
 
 Tests mock all Matter I/O and USB devices and run against a temporary state directory,
-so they never touch your real `~/.vibesignal` or bulb. The Tk widget render test skips
-when no Tk display is available.
+so they never touch your real `~/.vibesignal` or bulb.
 
-Layout: `store.py` (session files, atomic writes) · `resolve.py` (states, priority,
-lifetimes) · `colors.py` (color mapping, themes, import/export) · `light.py` (USB) ·
-`matter.py` (Matter client and worker) · `panel.py` / `widget.py` (screen renderers) ·
-`installer.py` (hooks, launchers, autostart) · `__main__.py` (CLI).
+Layout: `matter.py` (Matter client and worker) · `colors.py` (color mapping, themes,
+import/export) · `resolve.py` (states, priority, lifetimes) · `store.py` (session files,
+atomic writes) · `installer.py` (hooks, OpenCode plugin, services) · `__main__.py`
+(CLI) · `light.py` / `widget.py` / `panel.py` (upstream displays).
 
 ## Contributing
 
@@ -437,10 +379,10 @@ Feedback and collaboration are welcome, especially:
 - agent integrations and hook mappings for other tools,
 - better palettes. Keep the four states clearly distinguishable on real hardware.
 
-Please [open an issue](https://github.com/noahyoungs/vibesignal/issues) with your setup and `vibesignal status`
-output (it contains no credentials). Pull requests should include tests (`pytest -q`
-passes) and keep hooks fast and non-blocking. Ideas that fit upstream VibeSignal
-itself are best proposed [upstream](https://github.com/yzhao062/vibesignal).
+Please [open an issue](https://github.com/noahyoungs/vibesignal/issues) with your setup
+and `vibesignal status` output (it contains no credentials). Pull requests should
+include tests (`pytest -q` passes) and keep hooks fast and non-blocking. Improvements to
+the USB light or widget are best proposed [upstream](https://github.com/yzhao062/vibesignal).
 
 ## Credits and license
 
