@@ -5,6 +5,7 @@
 **An ambient status light for AI coding agents: Claude Code, Codex, and OpenCode.
 Drive a USB busylight, an on-screen widget, or a Matter smart bulb.**
 
+[![CI](https://github.com/noahyoungs/vibesignal/actions/workflows/ci.yml/badge.svg)](https://github.com/noahyoungs/vibesignal/actions/workflows/ci.yml)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
 [![Status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#limitations)
@@ -65,7 +66,7 @@ mode matters for Matter: `install-matter-autostart` runs the Node runtime from t
 checkout's `matter-server/` directory.
 
 ```bash
-git clone <this-repository-url> vibesignal
+git clone https://github.com/noahyoungs/vibesignal.git vibesignal
 cd vibesignal
 python3 -m venv .venv
 .venv/bin/pip install -e '.[matter]'
@@ -79,6 +80,12 @@ With [uv](https://docs.astral.sh/uv/):
 uv venv .venv --python 3.11
 uv pip install --python .venv/bin/python -e '.[matter,macos,dev]'
 ```
+
+The package is named `vibesignal-matter` so it can't be confused with upstream's
+`vibesignal` on PyPI; the command and Python module are still `vibesignal`. If you
+previously installed upstream into the same environment, `pip uninstall vibesignal`
+first. For USB or widget use without Matter, a non-editable install also works:
+`pip install 'vibesignal-matter @ git+https://github.com/noahyoungs/vibesignal.git'`.
 
 The commands below write `vibesignal`; use `.venv/bin/vibesignal` if the venv isn't
 activated. `install-hooks` pins the absolute path of the `vibesignal` you run it with,
@@ -429,7 +436,7 @@ Feedback and collaboration are welcome, especially:
 - agent integrations and hook mappings for other tools,
 - better palettes. Keep the four states clearly distinguishable on real hardware.
 
-Please open an issue on this repository with your setup and `vibesignal status`
+Please [open an issue](https://github.com/noahyoungs/vibesignal/issues) with your setup and `vibesignal status`
 output (it contains no credentials). Pull requests should include tests (`pytest -q`
 passes) and keep hooks fast and non-blocking. Ideas that fit upstream VibeSignal
 itself are best proposed [upstream](https://github.com/yzhao062/vibesignal).
@@ -438,6 +445,6 @@ itself are best proposed [upstream](https://github.com/yzhao062/vibesignal).
 
 VibeSignal was created by [Yue Zhao](https://github.com/yzhao062)
 ([upstream repository](https://github.com/yzhao062/vibesignal)). This fork's additions
-are distributed under the same terms.
+by Noah Youngs are distributed under the same terms.
 
-[BSD 2-Clause](LICENSE) © 2026 Yue Zhao
+[BSD 2-Clause](LICENSE) © 2026 Yue Zhao; fork additions © 2026 Noah Youngs

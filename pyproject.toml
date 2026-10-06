@@ -1,14 +1,15 @@
 [project]
-name = "vibesignal"
-version = "0.1.2"
-description = "Physical status light for coding agents (Claude Code / Codex / OpenCode)"
+name = "vibesignal-matter"
+version = "0.2.0"
+description = "VibeSignal fork: agent status light for Claude Code, Codex, and OpenCode with Matter smart-bulb support and color themes"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Yue Zhao", email = "yzhao010@usc.edu" }]
+maintainers = [{ name = "Noah Youngs" }]
 keywords = [
     "claude-code", "codex", "ai-agent", "status-light", "busylight",
-    "tkinter", "macos", "windows", "linux", "developer-tools",
+    "tkinter", "macos", "matter", "smart-bulb", "opencode", "windows", "linux", "developer-tools",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -38,9 +39,10 @@ matter = ["websockets>=15,<17"]
 vibesignal = "vibesignal.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/yzhao062/vibesignal"
-Repository = "https://github.com/yzhao062/vibesignal"
-Issues = "https://github.com/yzhao062/vibesignal/issues"
+Homepage = "https://github.com/noahyoungs/vibesignal"
+Repository = "https://github.com/noahyoungs/vibesignal"
+Issues = "https://github.com/noahyoungs/vibesignal/issues"
+Upstream = "https://github.com/yzhao062/vibesignal"
 
 [build-system]
 requires = ["setuptools>=61"]

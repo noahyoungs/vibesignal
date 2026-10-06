@@ -10,6 +10,9 @@ permissions:
 jobs:
   build:
     name: Build distribution
+    # Upstream's PyPI release job. This fork (vibesignal-matter) is installed from
+    # source and does not publish, so tags pushed here are a no-op.
+    if: github.repository == 'yzhao062/vibesignal'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

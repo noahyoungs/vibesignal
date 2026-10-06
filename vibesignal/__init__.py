@@ -9,4 +9,4 @@ See README.md and DESIGN.md.
 from .resolve import State, resolve_color
 
 __all__ = ["State", "resolve_color"]
-__version__ = "0.1.2"
+__version__ = "0.2.0"
