@@ -690,12 +690,29 @@ def test_unknown_agent_rejected():
 
 def test_agent_hooks_spec_codex_uses_permissionrequest():
     # Codex's approval/input event is PermissionRequest, NOT Claude's
-    # Notification/permission_prompt, and Codex has no StopFailure/SessionEnd.
+    # Notification/permission_prompt. Current Codex also provides SessionEnd.
     spec = installer.agent_hooks_spec(["/env/bin/vibesignal"], "codex")
     assert "PermissionRequest" in spec
     assert "Notification" not in spec
     assert "--state blocked" in spec["PermissionRequest"][0]["hooks"][0]["command"]
-    assert "StopFailure" not in spec and "SessionEnd" not in spec
+    assert "StopFailure" not in spec
+    assert "SessionEnd" in spec
+    assert " end --agent codex --quiet" in spec["SessionEnd"][0]["hooks"][0]["command"]
+
+
+def test_opencode_plugin_tracks_concurrent_session_events():
+    source = installer.opencode_plugin_source(["/env/bin/vibesignal"])
+    assert "permission.asked" in source and '"blocked"' in source
+    assert "question.asked" in source
+    assert "session.idle" in source and '"done"' in source
+    assert "session.error" in source and '"error"' in source
+    assert "session.deleted" in source and 'emit("end"' in source
+    assert "const blocked = new Set()" in source
+    assert "const ignored = new Set()" in source
+    assert "info?.parentID" in source
+    assert "client.session.get" in source
+    assert 'emit("end", "", id, cwd)' in source
+    assert "/env/bin/vibesignal" in source
     # Claude keeps the full Claude vocabulary and does NOT use PermissionRequest.
     claude = installer.agent_hooks_spec(["/env/bin/vibesignal"], "claude")
     assert "Notification" in claude and "SessionEnd" in claude
@@ -820,8 +837,8 @@ def test_merge_hooks_keeps_foreign_sibling_in_same_entry():
 
 
 def test_merge_hooks_converges_events_dropped_from_spec():
-    # A prior install left codex hooks under events the CURRENT spec no longer
-    # emits (Notification/SessionEnd, from before the schema fix). Re-install must
+    # A prior install left codex hooks under an event the current spec no longer
+    # emits (Notification). Re-install must
     # drop those stale vibesignal handlers, not just re-pin the current event set.
     settings = {"hooks": {
         "Notification": [{"matcher": "permission_prompt", "hooks": [
@@ -834,7 +851,8 @@ def test_merge_hooks_converges_events_dropped_from_spec():
     installer._merge_hooks(settings, installer.agent_hooks_spec(["/new/vibesignal"], "codex"))
     hooks = settings["hooks"]
     assert "Notification" not in hooks   # stale vibesignal-only event dropped
-    assert "SessionEnd" not in hooks     # stale vibesignal-only event dropped
+    assert "SessionEnd" in hooks         # replaced by the current pinned handler
+    assert "/new/vibesignal" in hooks["SessionEnd"][0]["hooks"][0]["command"]
     posttool = [h["command"] for e in hooks["PostToolUse"] for h in e["hooks"]]
     assert "/opt/foreign.sh" in posttool  # foreign sibling preserved
     assert any(c.endswith("--quiet") and "/new/vibesignal" in c for c in posttool)

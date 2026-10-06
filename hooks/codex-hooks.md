@@ -69,7 +69,8 @@ subprocess.run([
 Codex 0.130+ exposes a hooks system that fires on the same per-turn events Claude
 Code uses, configured in `~/.codex/config.toml` or an isolated `~/.codex/hooks.json`.
 Map `UserPromptSubmit` and `PostToolUse` to `working`, `PermissionRequest` to
-`blocked`, and `Stop` to `done` for the same live states as the Claude side. Trust the
+`blocked`, `Stop` to `done`, and `SessionEnd` to `end` for the same live states as the
+Claude side. Trust the
 hooks once via `/hooks` in a Codex session. Use `--quiet` for Codex hooks: some hook
 types parse stdout as JSON, so normal human-readable status text causes an invalid
 hook output error.
@@ -84,12 +85,11 @@ builds or for environments where the hooks system is disabled.
 
 ## SessionEnd
 
-Codex has no `SessionEnd` hook event (verified against the official Codex hooks
-docs), so `install-hooks --agent codex` does NOT wire one. Unlike the Claude side,
-a closed Codex session has no session-close hook to clear it at once; it ages out
-by its per-state lifetime instead -- `done` through the 90s fade, `working` after
-the 10-minute TTL, `blocked` or `error` at the 8h backstop. Add a Codex `end` hook
-only if a later Codex version gains a session-close event.
+Current Codex releases fire `SessionEnd`, so `install-hooks --agent codex` wires it
+to `vibesignal end --agent codex --quiet` and a closed chat leaves the light at once,
+as on the Claude side. On an older Codex without that event, a closed session ages out
+by its per-state lifetime instead: `done` after 90 s, `error` after 5 min, `working`
+after 10 min, `blocked` at the 8 h backstop.
 
 This keeps the Claude Code and Codex paths on one light and one state store, which
 satisfies the cross-agent requirement: the function works under role reversal or

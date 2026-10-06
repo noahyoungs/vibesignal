@@ -5,6 +5,7 @@ from vibesignal.resolve import (
     BLOCKED_TTL_SECONDS,
     COLORS,
     DONE_TTL_SECONDS,
+    ERROR_TTL_SECONDS,
     State,
     WORKING_TTL_SECONDS,
     aggregate,
@@ -153,14 +154,14 @@ def test_working_drops_after_its_ttl(tmp_path, monkeypatch):
     assert resolve_per_session(now=1000.0 + WORKING_TTL_SECONDS + 1) == []
 
 
-def test_error_persists_then_clears_at_backstop(tmp_path, monkeypatch):
-    # `error` shares the blocked 8h backstop: a manual error state stays visible
-    # past the store TTL, then self-cleans at the backstop like a crashed session.
+def test_error_expires_after_five_minutes(tmp_path, monkeypatch):
     monkeypatch.setenv("VIBECODING_SIGNAL_DIR", str(tmp_path))
     store.record("claude", "s1", "error", project="p", now=1000.0)
-    past_store_ttl = resolve_per_session(now=1000.0 + store.DEFAULT_TTL_SECONDS + 60)
-    assert [r["state"] for r in past_store_ttl] == ["error"]
-    assert resolve_per_session(now=1000.0 + BLOCKED_TTL_SECONDS + 1) == []
+    store.record("opencode", "s2", "working", project="p", now=1000.0)
+    assert ERROR_TTL_SECONDS == 300
+    assert resolve_color(now=1299.0)[0] == State.ERROR
+    assert resolve_color(now=1301.0)[0] == State.WORKING
+    assert [r["state"] for r in resolve_per_session(now=1301.0)] == ["working"]
 
 
 def test_done_visible_at_exact_ttl_boundary(tmp_path, monkeypatch):

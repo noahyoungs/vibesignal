@@ -39,6 +39,16 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "vibesignal end --agent codex --quiet"
+          }
+        ]
+      }
     ]
   }
 }

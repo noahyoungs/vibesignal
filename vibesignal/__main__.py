@@ -214,6 +214,8 @@ def cmd_install_hooks(args) -> int:
     print(f"[vibesignal] wired {args.agent} hooks into {path}")
     if args.agent == "codex":
         print("Trust the new hooks once via /hooks in a Codex session, then restart it.")
+    elif args.agent == "opencode":
+        print("Restart OpenCode so it loads the global VibeSignal plugin.")
     else:
         print("Takes effect on the next Claude Code session (or a settings reload).")
     print("Re-run after switching env to re-pin the path.")
@@ -301,7 +303,7 @@ def main(argv: list | None = None) -> int:
         help="wire agent hooks into the settings file, absolute path pinned (all platforms)",
     )
     p_install_hooks.add_argument(
-        "--agent", default="claude", choices=["claude", "codex"],
+        "--agent", default="claude", choices=["claude", "codex", "opencode"],
         help="which agent's settings file to wire (default: claude)",
     )
     p_install_hooks.set_defaults(func=cmd_install_hooks)
@@ -311,7 +313,7 @@ def main(argv: list | None = None) -> int:
         help="remove vibesignal hooks from an agent settings file",
     )
     p_uninstall_hooks.add_argument(
-        "--agent", default="claude", choices=["claude", "codex"],
+        "--agent", default="claude", choices=["claude", "codex", "opencode"],
         help="which agent's settings file to clean (default: claude)",
     )
     p_uninstall_hooks.set_defaults(func=cmd_uninstall_hooks)

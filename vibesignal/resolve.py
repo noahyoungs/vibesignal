@@ -43,7 +43,8 @@ COLORS: dict[str, list | None] = {
 # Each state has its own lifetime, because the hooks only refresh a session's
 # timestamp when something happens. `working` refreshes on every tool call, so a
 # working session silent past its TTL is treated as dead. `done` is a transient
-# "your move" pulse that fades quickly. `blocked` and `error` are the opposite:
+# "your move" pulse that fades quickly. Errors fade after five minutes.
+# Blocked prompts use a longer backstop:
 # nothing refreshes them while they wait on you, so a short TTL would make a
 # long-pending prompt vanish exactly when it is most overdue. They persist for a
 # long backstop instead, cleared sooner when you act (state changes), when
@@ -52,12 +53,13 @@ COLORS: dict[str, list | None] = {
 WORKING_TTL_SECONDS = store.DEFAULT_TTL_SECONDS  # 600 (10 min): silent working is stale
 DONE_TTL_SECONDS = 90.0                          # transient "your move" pulse
 BLOCKED_TTL_SECONDS = 8 * 60 * 60.0              # 28800 (8 h): needs-you spans a workday
+ERROR_TTL_SECONDS = 5 * 60.0                     # 300 (5 min): transient error alert
 
 _STATE_TTL_SECONDS: dict[str, float] = {
     State.WORKING: WORKING_TTL_SECONDS,
     State.DONE: DONE_TTL_SECONDS,
     State.BLOCKED: BLOCKED_TTL_SECONDS,
-    State.ERROR: BLOCKED_TTL_SECONDS,
+    State.ERROR: ERROR_TTL_SECONDS,
 }
 
 # Load every file that could still be live under the longest per-state TTL, then
