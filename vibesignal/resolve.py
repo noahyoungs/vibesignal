@@ -1,10 +1,14 @@
-"""Resolve per-session states into light colors and panel rows, by priority."""
+"""Resolve per-session states into light colors and panel rows, by priority.
+
+State validity, priority, aliases, and lifetimes live here and do not depend on
+the color mapping; colors come from colors.py (user-configurable, idle = off).
+"""
 
 from __future__ import annotations
 
 import time
 
-from . import store
+from . import colors, store
 
 
 class State:
@@ -30,15 +34,6 @@ def normalize(state: object) -> str:
 
 # Higher index = higher priority when several sessions are active at once.
 PRIORITY = [State.IDLE, State.WORKING, State.DONE, State.ERROR, State.BLOCKED]
-
-# Solid RGB per state. None means "off".
-COLORS: dict[str, list | None] = {
-    State.WORKING: [0, 200, 60],   # green
-    State.BLOCKED: [220, 38, 38],  # red (needs you now)
-    State.DONE: [0, 90, 255],      # blue
-    State.ERROR: [147, 51, 234],   # violet (manual failure, distinct from blocked)
-    State.IDLE: None,              # off
-}
 
 # Each state has its own lifetime, because the hooks only refresh a session's
 # timestamp when something happens. `working` refreshes on every tool call, so a
@@ -99,7 +94,7 @@ def resolve_color(ttl: float = _LOAD_HORIZON_SECONDS,
             continue
         states.append(st)
     state = aggregate(states)
-    return state, COLORS[state]
+    return state, colors.load_rgb()[state]
 
 
 def resolve_per_session(ttl: float = _LOAD_HORIZON_SECONDS,
@@ -107,9 +102,10 @@ def resolve_per_session(ttl: float = _LOAD_HORIZON_SECONDS,
     if now is None:
         now = time.time()
     rows = []
+    rgb = colors.load_rgb()
     for d in store.load_active(ttl=ttl, now=now):
         st = normalize(d.get("state", State.IDLE))
-        if st not in COLORS:
+        if st not in PRIORITY:
             st = State.IDLE
         ts = d.get("ts", 0)
         if _expired(st, ts, now):
@@ -119,7 +115,7 @@ def resolve_per_session(ttl: float = _LOAD_HORIZON_SECONDS,
             "project": d.get("project") or "?",
             "session": d.get("session", "?"),
             "state": st,
-            "color": COLORS[st],
+            "color": rgb[st],
             "ts": ts,
         })
     # Highest priority first (blocked at top); within a state, oldest first.

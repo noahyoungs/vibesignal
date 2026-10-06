@@ -23,9 +23,17 @@ def test_glyph_idle_vs_active():
     assert widget.glyph("done") == "●"
 
 
-def test_hex_covers_all_states():
-    for s in ("blocked", "done", "working", "error", "idle"):
-        assert s in widget.HEX
+def test_state_hex_uses_resolved_color_and_grey_for_idle():
+    assert widget.state_hex([220, 38, 38]) == "#dc2626"
+    assert widget.state_hex(None) == widget._IDLE
+
+
+def test_alarm_palette_follows_configured_color_and_stays_legible():
+    dark = widget._palette("blocked", [220, 38, 38])
+    assert dark["alarm"] and dark["frame"] == "#dc2626" and dark["header_fg"] == "#ffffff"
+    light = widget._palette("blocked", [232, 192, 0])  # warm-theme gold
+    assert light["header_fg"] == widget._HEADER  # dark text on a light header
+    assert widget._palette("working", [0, 200, 60]) is widget._CALM
 
 
 def test_row_fields_blocked():

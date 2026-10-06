@@ -21,7 +21,7 @@ import time
 import tkinter as tk
 import tkinter.font as tkfont
 
-from . import resolve
+from . import colors, resolve
 from .panel import _fmt_age
 
 
@@ -39,14 +39,9 @@ def _font_family() -> str:
         return "Segoe UI"
     return "DejaVu Sans"
 
-# Soft light theme. A left accent bar per row carries the state color.
-HEX = {
-    "blocked": "#dc2626",  # red (needs you now)
-    "done": "#2563eb",     # blue
-    "working": "#16a34a",  # green
-    "error": "#9333ea",    # violet (manual failure)
-    "idle": "#9ca3af",     # grey
-}
+# Soft light theme. A left accent bar per row carries the state color, which comes
+# from the configured mapping (colors.py) so the widget matches the light/bulb.
+_IDLE = "#9ca3af"    # grey: idle has no configured color (the light is off)
 _BORDER = "#c9ced8"
 _BG = "#e9ecf1"      # soft cool grey card (calmer than stark white)
 _FG = "#272b31"
@@ -55,19 +50,36 @@ _DIMMER = "#959ba4"
 _RULE = "#d6dae1"
 _HEADER = "#2b3038"
 
-# When a session needs you, the whole panel goes red (violet for a manual error),
-# not just one row, so a blocked session is unmissable across several windows. Other
-# states keep the calm grey chrome.
+# When a session needs you, the whole panel takes the blocked (or error) color,
+# not just one row, so a blocked session is unmissable across several windows.
+# Other states keep the calm grey chrome.
 _CALM = {"frame": _BORDER, "header_bg": _BG, "header_fg": _HEADER, "wash": _BG, "alarm": False}
 
 
-def _palette(agg: str) -> dict:
-    if agg == "blocked":
-        return {"frame": "#dc2626", "header_bg": "#dc2626", "header_fg": "#ffffff",
-                "wash": "#fdecec", "alarm": True}
-    if agg == "error":
-        return {"frame": "#9333ea", "header_bg": "#9333ea", "header_fg": "#ffffff",
-                "wash": "#f5ecfd", "alarm": True}
+def _mix(rgb, toward, amount: float) -> str:
+    """Blend rgb toward another rgb by `amount` (0..1), as a Tk hex string."""
+    return colors.rgb_to_hex(
+        [round(a + (b - a) * amount) for a, b in zip(rgb, toward)]
+    ).lower()
+
+
+def state_hex(rgb) -> str:
+    """Accent color for a resolved row/aggregate color (None = idle grey)."""
+    return colors.rgb_to_hex(rgb).lower() if rgb else _IDLE
+
+
+def text_hex(rgb) -> str:
+    """A darker shade of the state color, readable as text on the light card."""
+    return _mix(rgb, (0, 0, 0), 0.25) if rgb else _IDLE
+
+
+def _palette(agg: str, rgb) -> dict:
+    if agg in ("blocked", "error") and rgb:
+        r, g, b = rgb
+        light_bg = 0.299 * r + 0.587 * g + 0.114 * b > 160
+        return {"frame": state_hex(rgb), "header_bg": state_hex(rgb),
+                "header_fg": _HEADER if light_bg else "#ffffff",
+                "wash": _mix(rgb, (255, 255, 255), 0.9), "alarm": True}
     return _CALM
 
 
@@ -328,13 +340,13 @@ class Widget:
 
     def _tick(self):
         rows = resolve.resolve_per_session()
-        agg, _color = resolve.resolve_color()
+        agg, agg_color = resolve.resolve_color()
         now = time.time()
 
-        pal = _palette(agg)
+        pal = _palette(agg, agg_color)
         wash, hbg = pal["wash"], pal["header_bg"]
 
-        # Whole-panel alarm: the frame and header go red (violet for error) and the
+        # Whole-panel alarm: the frame and header take the blocked/error color and the
         # body is tinted, so a blocked session is visible without reading any row.
         self.root.configure(bg=pal["frame"])
         self.card.configure(bg=wash)
@@ -344,9 +356,9 @@ class Widget:
         self.header.configure(bg=hbg)
         self._rule.configure(bg=(hbg if pal["alarm"] else _RULE))
         self._title.configure(bg=hbg, fg=pal["header_fg"])
-        self._agg_dot.configure(bg=hbg, fg=("#ffffff" if pal["alarm"] else HEX.get(agg, _DIMMER)))
+        self._agg_dot.configure(bg=hbg, fg=(pal["header_fg"] if pal["alarm"] else state_hex(agg_color)))
         self._count.configure(text=(f"{len(rows)}" if rows else ""), bg=hbg,
-                              fg=("#ffffff" if pal["alarm"] else _DIMMER))
+                              fg=(pal["header_fg"] if pal["alarm"] else _DIMMER))
 
         for w in self._cells:
             w.destroy()
@@ -360,14 +372,13 @@ class Widget:
         else:
             for i, r in enumerate(rows):
                 _g, project, agent, state, age = row_fields(r, now)
-                color = HEX.get(state, _FG)
-                bar = tk.Frame(self.body, bg=color)
+                bar = tk.Frame(self.body, bg=state_hex(r.get("color")))
                 bar.grid(row=i, column=0, sticky="nsew", padx=(0, 9), pady=2)
                 cells = [
                     bar,
                     tk.Label(self.body, text=project, bg=wash, fg=_FG, font=self._f_proj, anchor="w"),
                     tk.Label(self.body, text=agent, bg=wash, fg=_DIM, font=self._f_dim, anchor="w"),
-                    tk.Label(self.body, text=state, bg=wash, fg=color, font=self._f_dim, anchor="w"),
+                    tk.Label(self.body, text=state, bg=wash, fg=text_hex(r.get("color")), font=self._f_dim, anchor="w"),
                     tk.Label(self.body, text=age, bg=wash, fg=_DIMMER, font=self._f_dim, anchor="e"),
                 ]
                 cells[1].grid(row=i, column=1, sticky="w", pady=1)

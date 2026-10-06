@@ -3,7 +3,6 @@ import json
 from vibesignal import store
 from vibesignal.resolve import (
     BLOCKED_TTL_SECONDS,
-    COLORS,
     DONE_TTL_SECONDS,
     ERROR_TTL_SECONDS,
     State,
@@ -49,11 +48,37 @@ def test_unknown_states_ignored():
 
 
 def test_colors_cover_all_states():
+    from vibesignal import colors
+    rgb = colors.load_rgb()
     for s in (State.WORKING, State.BLOCKED, State.DONE, State.ERROR, State.IDLE):
-        assert s in COLORS
-    assert COLORS[State.IDLE] is None
-    assert COLORS[State.BLOCKED] == [220, 38, 38]
-    assert COLORS[State.DONE] == [0, 90, 255]
+        assert s in rgb
+    assert rgb[State.IDLE] is None
+    assert rgb[State.BLOCKED] == [220, 38, 38]
+    assert rgb[State.DONE] == [0, 90, 255]
+
+
+def test_configurable_states_are_exactly_the_active_priority_states():
+    from vibesignal import colors
+    from vibesignal.resolve import PRIORITY
+    assert set(colors.ACTIVE_STATES) == set(PRIORITY) - {State.IDLE}
+
+
+def test_custom_colors_change_color_but_not_priority_or_ttl(tmp_path, monkeypatch):
+    from vibesignal import colors
+    monkeypatch.setenv("VIBECODING_SIGNAL_DIR", str(tmp_path))
+    colors.apply_theme("cool")
+    store.record("claude", "s1", "working", project="p", now=1000.0)
+    store.record("codex", "s2", "needs_input", project="p", now=1000.0)
+    store.record("opencode", "s3", "done", project="p", now=1000.0)
+    state, color = resolve_color(now=1001.0)
+    assert state == State.BLOCKED  # alias + priority unchanged
+    assert color == colors.hex_to_rgb(colors.THEMES["cool"]["blocked"])
+    rows = resolve_per_session(now=1001.0)
+    assert [r["state"] for r in rows] == ["blocked", "done", "working"]
+    assert rows[2]["color"] == colors.hex_to_rgb(colors.THEMES["cool"]["working"])
+    # done still fades at its own TTL regardless of the palette.
+    later = resolve_per_session(now=1000.0 + DONE_TTL_SECONDS + 1)
+    assert [r["state"] for r in later] == ["blocked", "working"]
 
 
 def test_per_session_orders_blocked_first(tmp_path, monkeypatch):

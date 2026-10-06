@@ -5,6 +5,7 @@ Usage:
   vibesignal status
   vibesignal clear [--agent A --session S]
   vibesignal off
+  vibesignal config [--color STATE HEX | --theme NAME | --export-colors PATH ...]
   vibesignal matter-config [--brightness PCT ...]
 
 The `event` command reads the session id from the hook's stdin JSON when
@@ -229,6 +230,65 @@ def cmd_matter_config(args) -> int:
     return 0
 
 
+def _apply_light_now() -> None:
+    """Re-render the USB light after a color change (no-op without a device)."""
+    try:
+        with lock.file_lock(store.lock_path()):
+            _apply_light()
+    except Exception as exc:
+        print(f"[vibesignal] colors saved; USB light not updated: {exc}", file=sys.stderr)
+
+
+def _print_colors(colors_map: dict, warning: str | None = None) -> None:
+    from . import colors
+    theme = colors.theme_name(colors_map) or "custom"
+    print(f"colors (theme: {theme}; {colors.colors_path()})")
+    for state in colors.ACTIVE_STATES:
+        print(f"  {state:<8} {colors_map[state]}")
+    print(f"  {'idle':<8} off")
+    if warning:
+        print(f"warning: {warning}", file=sys.stderr)
+
+
+def cmd_config(args) -> int:
+    from . import colors
+    from .matter import config_path, load_config
+    try:
+        if args.list_themes:
+            current = colors.theme_name(colors.load_colors())
+            for name, theme in colors.THEMES.items():
+                mark = "*" if name == current else " "
+                swatches = "  ".join(f"{s}={theme[s]}" for s in colors.ACTIVE_STATES)
+                print(f"{mark} {name:<8} {swatches}")
+            return 0
+        if args.export_colors:
+            exported = colors.export_colors(args.export_colors)
+            print(f"[vibesignal] exported {colors.theme_name(exported) or 'custom'} colors "
+                  f"to {args.export_colors}")
+            return 0
+        if args.color:
+            updated = colors.set_colors(dict(args.color))
+        elif args.theme:
+            updated = colors.apply_theme(args.theme)
+        elif args.reset_colors:
+            updated = colors.reset_colors()
+        elif args.import_colors:
+            updated = colors.import_colors(args.import_colors)
+        else:  # --show, or no option at all
+            effective, warning = colors.read_saved()
+            _print_colors(effective, warning)
+            matter = load_config()
+            print(f"matter ({config_path()})")
+            print(f"  {_describe_matter(matter)}")
+            return 0
+    except colors.ColorConfigError as exc:
+        raise SystemExit(f"vibesignal: {exc}")
+    _apply_light_now()
+    _print_colors(updated)
+    print("[vibesignal] saved; the Matter worker and widget pick this up within a second")
+    return 0
+
+
 def cmd_install_matter_autostart(args) -> int:
     from . import installer
     paths = installer.install_matter_autostart(interface=args.interface)
@@ -397,6 +457,28 @@ def main(argv: list | None = None) -> int:
         help="constant bulb brightness for every active state, 1-100 percent",
     )
     p_matter_config.set_defaults(func=cmd_matter_config)
+
+    p_config = sub.add_parser(
+        "config",
+        help="show or change state colors and themes (no option: --show)",
+        description=(
+            "State colors apply to the USB light, the widget, and the Matter bulb. "
+            "idle is always off. Matter brightness is set separately with "
+            "`vibesignal matter-config --brightness`."
+        ),
+    )
+    config_action = p_config.add_mutually_exclusive_group()
+    config_action.add_argument("--show", action="store_true", help="print effective colors and Matter settings")
+    config_action.add_argument(
+        "--color", nargs=2, action="append", metavar=("STATE", "HEX"),
+        help="set one state color, e.g. --color working '#00C83C' (repeatable)",
+    )
+    config_action.add_argument("--theme", metavar="NAME", help="apply a built-in theme to all four states")
+    config_action.add_argument("--list-themes", action="store_true", help="list built-in themes")
+    config_action.add_argument("--reset-colors", action="store_true", help="restore the default colors")
+    config_action.add_argument("--export-colors", metavar="PATH", help="write the effective colors to a JSON file")
+    config_action.add_argument("--import-colors", metavar="PATH", help="replace all colors from a JSON file")
+    p_config.set_defaults(func=cmd_config)
 
     p_matter_nodes = sub.add_parser("matter-nodes", help="list commissioned Matter nodes")
     p_matter_nodes.set_defaults(func=cmd_matter_nodes)
