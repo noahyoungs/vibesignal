@@ -106,9 +106,13 @@ after you move or recreate the venv). Then:
 
 | Agent | `working` | `blocked` | `done` | `error` | session closed |
 |---|---|---|---|---|---|
-| Claude Code | `UserPromptSubmit`, `PostToolUse` | `Notification` (`permission_prompt`) | `Stop`, `StopFailure`, `Notification` (`idle_prompt`) | manual only | `SessionEnd` |
+| Claude Code | `UserPromptSubmit`, `PostToolUse` | `Notification` (`permission_prompt`) | `Stop`, `StopFailure`, `Notification` (`idle_prompt`), a denied permission prompt¹ | manual only | `SessionEnd` |
 | Codex | `UserPromptSubmit`, `PostToolUse` | `PermissionRequest` | `Stop` | manual only | `SessionEnd` |
 | OpenCode | `session.status` busy, permission/question replied | `permission.asked`, `question.asked` | `session.idle` | `session.error` | `session.deleted` |
+
+¹ Claude Code fires no hook when you deny a permission prompt; the turn just ends.
+VibeSignal keeps the session's transcript path and, while a session is `blocked`,
+treats a turn end recorded in the transcript after the block as `done`.
 
 Remove hooks with `vibesignal uninstall-hooks [--agent codex|opencode]`. To wire
 Claude Code or Codex by hand, see [`hooks/`](hooks/) and
@@ -390,8 +394,11 @@ This is an experimental personal project shared for feedback:
   until the next state change or a worker restart.
 - Hue accuracy depends on the bulb. Pastel (low-saturation) colors look whiter on some
   bulbs.
-- The OpenCode plugin depends on OpenCode's event names, which may change between
-  releases.
+- The OpenCode plugin targets OpenCode 1.x. OpenCode 2.x (bundled by OpenChamber)
+  rejects 1.x-style plugins, so OpenChamber sessions don't drive the light yet. Event
+  names may also change between releases.
+- Detecting a denied Claude Code permission prompt relies on Claude's transcript
+  format (a `system`/`turn_duration` entry), which isn't a documented interface.
 - `error` is detected automatically only for OpenCode (`session.error`). For Claude Code
   and Codex, set it manually with `vibesignal event --agent <name> --state error`.
 - One aggregate light per bulb. There is no per-session multi-bulb or LED-strip mapping

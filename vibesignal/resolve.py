@@ -6,7 +6,11 @@ the color mapping; colors come from colors.py (user-configurable, idle = off).
 
 from __future__ import annotations
 
+import functools
+import json
+import os
 import time
+from datetime import datetime
 
 from . import colors, store
 
@@ -70,6 +74,67 @@ def _expired(state: str, ts: object, now: float) -> bool:
     return age > ttl
 
 
+# Claude Code fires no hook when you deny a permission prompt (or interrupt at
+# it): no Stop, no PostToolUse, no PermissionDenied (that one is auto-mode only).
+# The turn simply ends, and only the session transcript records it, as a
+# `system`/`turn_duration` entry. So a blocked session whose transcript shows a
+# turn ending after the block is treated as done from that moment. A prompt that
+# is still pending has no such entry and stays blocked.
+_TRANSCRIPT_TAIL_BYTES = 64 * 1024
+
+
+def _iso_to_epoch(value: object) -> float | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+@functools.lru_cache(maxsize=64)
+def _last_turn_end(path: str, _mtime_ns: int, size: int) -> float | None:
+    """Time of the newest turn end in the transcript tail (cached per file version)."""
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(max(0, size - _TRANSCRIPT_TAIL_BYTES))
+            tail = handle.read().decode("utf-8", "ignore")
+    except OSError:
+        return None
+    for line in reversed(tail.splitlines()):
+        if '"turn_duration"' not in line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if entry.get("type") == "system" and entry.get("subtype") == "turn_duration":
+            return _iso_to_epoch(entry.get("timestamp"))
+    return None
+
+
+def _turn_ended_after(transcript: object, since: float) -> float | None:
+    if not isinstance(transcript, str):
+        return None
+    try:
+        stat = os.stat(transcript)
+    except OSError:
+        return None
+    if stat.st_mtime < since:  # untouched since the block: still pending
+        return None
+    ended = _last_turn_end(transcript, stat.st_mtime_ns, stat.st_size)
+    return ended if ended is not None and ended > since else None
+
+
+def _session_state(d: dict) -> tuple[str, object]:
+    """A session's effective (state, ts), resolving a block whose turn ended."""
+    st = normalize(d.get("state", State.IDLE))
+    ts = d.get("ts", 0)
+    if st == State.BLOCKED and isinstance(ts, (int, float)):
+        ended = _turn_ended_after(d.get("transcript"), ts)
+        if ended is not None:
+            return State.DONE, ended
+    return st, ts
+
+
 def aggregate(states: list[object]) -> str:
     best = State.IDLE
     best_rank = PRIORITY.index(State.IDLE)
@@ -89,8 +154,8 @@ def resolve_color(ttl: float = _LOAD_HORIZON_SECONDS,
         now = time.time()
     states = []
     for d in store.load_active(ttl=ttl, now=now):
-        st = normalize(d.get("state", State.IDLE))
-        if _expired(st, d.get("ts", 0), now):
+        st, ts = _session_state(d)
+        if _expired(st, ts, now):
             continue
         states.append(st)
     state = aggregate(states)
@@ -104,10 +169,9 @@ def resolve_per_session(ttl: float = _LOAD_HORIZON_SECONDS,
     rows = []
     rgb = colors.load_rgb()
     for d in store.load_active(ttl=ttl, now=now):
-        st = normalize(d.get("state", State.IDLE))
+        st, ts = _session_state(d)
         if st not in PRIORITY:
             st = State.IDLE
-        ts = d.get("ts", 0)
         if _expired(st, ts, now):
             continue
         rows.append({

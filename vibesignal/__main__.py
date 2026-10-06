@@ -99,8 +99,10 @@ def cmd_event(args) -> int:
             previous = store.read_session(args.agent, session) if args.ts else None
             prev_ts = (previous or {}).get("ts")
             if not (isinstance(prev_ts, (int, float)) and prev_ts > args.ts):
+                transcript = hook.get("transcript_path")
                 store.record(agent=args.agent, session=session, state=args.state,
-                             project=project, now=args.ts)
+                             project=project, now=args.ts,
+                             transcript=transcript if isinstance(transcript, str) else None)
             state, color = _apply_light()
         # --quiet keeps stdout empty for hosts that parse hook stdout as JSON
         # (Codex rejects a plain status line from a PostToolUse hook).

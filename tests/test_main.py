@@ -312,3 +312,12 @@ def test_event_without_ts_always_records(tmp_path, monkeypatch):
     _event("done", ts=time.time() + 60)
     _event("working")                   # hooks without --ts keep last-writer-wins
     assert store.read_session("opencode", "s1")["state"] == "working"
+
+
+def test_event_stores_hook_transcript_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("VIBECODING_SIGNAL_DIR", str(tmp_path))
+    monkeypatch.setattr(cli.light, "set_color", lambda rgb: False)
+    monkeypatch.setattr(cli, "_read_hook_stdin",
+                        lambda: {"session_id": "s9", "transcript_path": "/x/s9.jsonl"})
+    cli.main(["event", "--agent", "claude", "--state", "blocked", "--quiet"])
+    assert store.read_session("claude", "s9")["transcript"] == "/x/s9.jsonl"

@@ -89,6 +89,10 @@ o iet-paper        claude   o done       3s
 
 Refresh about once a second. ANSI color, standard library only (no new dependency), works in Windows Terminal and on macOS / Linux. It is a foreground viewer the user starts and stops; the USB light stays hook-driven.
 
+### Denied Permission Prompts (fork)
+
+Claude Code fires no hook when the user denies a permission prompt: no `Stop`, no `PostToolUse`, and `PermissionDenied` covers only auto-mode denials. The turn ends silently, so the session would stay `blocked` (8 h backstop). Hooks therefore store the hook's `transcript_path` with the session record, and the resolver treats a `blocked` session as `done` (timestamped at the turn end, so it fades 90 s later) once its transcript records a `system`/`turn_duration` entry after the block. A pending prompt has no such entry and stays blocked. The check reads only the transcript tail, only when the file changed after the block, and is cached per file version. It depends on Claude's transcript format, which is not a documented interface.
+
 ## Matter Worker (fork)
 
 `vibesignal matter-sync` runs persistently (a launchd agent on macOS, installed by `install-matter-autostart` together with the local Matter Server). Each tick (0.5 s) it re-reads `matter.json` and `colors.json`, calls `resolve_color()`, and sends commands only when the resolved (config, color) target changes, or every 5 s to retry a failure. Re-reading every tick is what makes color, theme, import, and brightness changes apply without a restart, and what lets lifetime expiry turn the bulb off with no new event. Errors are written to `matter_status.json` and shown by `vibesignal status`.

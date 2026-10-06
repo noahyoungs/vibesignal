@@ -64,7 +64,7 @@ def _session_path(agent: str, session: str) -> Path:
 
 
 def record(agent: str, session: str, state: str, project: str | None = None,
-           now: float | None = None) -> None:
+           now: float | None = None, transcript: str | None = None) -> None:
     now = time.time() if now is None else now
     payload = {
         "agent": agent,
@@ -73,6 +73,8 @@ def record(agent: str, session: str, state: str, project: str | None = None,
         "project": project,
         "ts": now,
     }
+    if transcript:
+        payload["transcript"] = transcript
     _atomic_write(_session_path(agent, session), json.dumps(payload))
 
 

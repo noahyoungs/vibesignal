@@ -1,3 +1,4 @@
+import time
 import json
 
 from vibesignal import store
@@ -197,3 +198,41 @@ def test_done_visible_at_exact_ttl_boundary(tmp_path, monkeypatch):
     at_boundary = resolve_per_session(ttl=600, now=1000.0 + DONE_TTL_SECONDS)
     assert [r["state"] for r in at_boundary] == ["done"]
     assert resolve_per_session(ttl=600, now=1000.0 + DONE_TTL_SECONDS + 1) == []
+
+
+def _transcript(path, *turn_end_epochs):
+    """A minimal Claude transcript: a tool_use, then optional turn-end entries."""
+    from datetime import datetime, timezone
+    lines = [json.dumps({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash"}]}})]
+    for t in turn_end_epochs:
+        stamp = datetime.fromtimestamp(t, timezone.utc).isoformat().replace("+00:00", "Z")
+        lines.append(json.dumps({"type": "user", "message": {"content": [{"type": "text", "text": "[Request interrupted by user for tool use]"}]}}))
+        lines.append(json.dumps({"type": "system", "subtype": "turn_duration", "timestamp": stamp}))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return str(path)
+
+
+def test_denied_permission_prompt_resolves_to_done(tmp_path, monkeypatch):
+    # Claude fires no hook on a denied prompt; only the transcript records the
+    # ended turn. The blocked session must become done, then fade like done.
+    monkeypatch.setenv("VIBECODING_SIGNAL_DIR", str(tmp_path))
+    now = time.time()
+    t = _transcript(tmp_path / "s.jsonl", now - 3)       # denied 3 s ago
+    store.record("claude", "s1", "blocked", project="p", now=now - 10, transcript=t)
+    assert resolve_color(now=now)[0] == State.DONE
+    [row] = resolve_per_session(now=now)
+    assert row["state"] == "done" and abs(row["ts"] - (now - 3)) < 0.01
+    assert resolve_color(now=now - 3 + DONE_TTL_SECONDS + 1)[0] == State.IDLE
+
+
+def test_pending_permission_prompt_stays_blocked(tmp_path, monkeypatch):
+    monkeypatch.setenv("VIBECODING_SIGNAL_DIR", str(tmp_path))
+    now = time.time()
+    # An earlier turn ended before this prompt was raised: not a resolution.
+    t = _transcript(tmp_path / "s.jsonl", now - 120)
+    store.record("claude", "s1", "blocked", project="p", now=now - 10, transcript=t)
+    assert resolve_color(now=now)[0] == State.BLOCKED
+    store.record("claude", "s2", "blocked", project="p", now=now - 10,
+                 transcript=str(tmp_path / "missing.jsonl"))
+    store.record("codex", "s3", "blocked", project="p", now=now - 10)  # no transcript
+    assert {r["state"] for r in resolve_per_session(now=now)} == {"blocked"}
