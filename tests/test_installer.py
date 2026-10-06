@@ -700,6 +700,31 @@ def test_agent_hooks_spec_codex_uses_permissionrequest():
     assert " end --agent codex --quiet" in spec["SessionEnd"][0]["hooks"][0]["command"]
 
 
+def test_opencode_plugin_supports_opencode_2_default_export():
+    # OpenCode 2.x (OpenChamber) only loads `export default {id, setup}` and
+    # delivers events as an async iterable; 1.x keeps the named export.
+    source = installer.opencode_plugin_source(["/env/bin/vibesignal"])
+    assert "export const VibeSignal = async (ctx)" in source
+    # 1.x rejects a default export without server(); 2.x needs id + setup.
+    assert 'export default {\n  id: "vibesignal",\n  server: VibeSignal,\n  setup: async (api)' in source
+    assert "for await (const event of api.event.subscribe({ signal: abort.signal }))" in source
+    for event, state in [
+        ("session.execution.started", "working"), ("permission.asked", "blocked"),
+        ("permission.replied", "working"), ("session.execution.succeeded", "done"),
+        ("session.execution.interrupted", "done"), ("session.execution.failed", "error"),
+    ]:
+        assert f'"{event}": "{state}"' in source
+    # Several per-project instances see the same events: handle each id once.
+    assert "globalThis.__vibesignalV2Seen" in source and "v2Seen.has(event.id)" in source
+    # Never await inside the drain loop, and order racing processes by event time.
+    assert "v2Handle(api, event).catch(() => {})" in source
+    assert "event.created" in source
+    # Child (sub-agent) sessions are ignored via parentID.
+    assert "child: Boolean(text(info?.parentID))" in source
+    # Updates must outlive an OpenCode process that exits right after a turn.
+    assert "detached: true" in source
+
+
 def test_opencode_plugin_tracks_concurrent_session_events():
     source = installer.opencode_plugin_source(["/env/bin/vibesignal"])
     assert "permission.asked" in source and '"blocked"' in source

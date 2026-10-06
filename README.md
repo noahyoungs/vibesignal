@@ -115,7 +115,8 @@ after you move or recreate the venv). Then:
 |---|---|---|---|---|---|
 | Claude Code | `UserPromptSubmit`, `PostToolUse` | `Notification` (`permission_prompt`) | `Stop`, `StopFailure`, `Notification` (`idle_prompt`), a denied permission prompt¹ | manual only | `SessionEnd` |
 | Codex | `UserPromptSubmit`, `PostToolUse` | `PermissionRequest` | `Stop` | manual only | `SessionEnd` |
-| OpenCode | `session.status` busy, permission/question replied | `permission.asked`, `question.asked` | `session.idle` | `session.error` | `session.deleted` |
+| OpenCode 1.x | `session.status` busy, permission/question replied | `permission.asked`, `question.asked` | `session.idle` | `session.error` | `session.deleted` |
+| OpenCode 2.x (OpenChamber) | `session.execution.started`, permission replied/rejected | `permission.asked` | `session.execution.succeeded`/`interrupted` | `session.execution.failed`, `session.error` | `session.deleted` |
 
 ¹ Claude Code fires no hook when you deny a permission prompt; the turn just ends.
 VibeSignal keeps the session's transcript path and, while a session is `blocked`,
@@ -371,7 +372,7 @@ See [DESIGN.md](DESIGN.md) for the design history and rationale.
 |---|---|
 | Matter bulb | Linkind ST19 (AiDot) Matter-over-Wi-Fi color bulb, first commissioned in Apple Home |
 | Matter host | macOS with launchd, Node.js 22, `matter-server` 1.4.0 |
-| Agents | Claude Code, Codex, OpenCode |
+| Agents | Claude Code 2.1, Codex 0.151, OpenCode 1.18 and 2.0.18 (bundled by OpenChamber) |
 | Core, widget, installers | Upstream CI on Windows, macOS, and Linux, Python 3.11–3.13 |
 | USB lights | Upstream support through `busylight-core`; not re-tested in this fork |
 
@@ -401,9 +402,9 @@ This is an experimental personal project shared for feedback:
   until the next state change or a worker restart.
 - Hue accuracy depends on the bulb. Pastel (low-saturation) colors look whiter on some
   bulbs.
-- The OpenCode plugin targets OpenCode 1.x. OpenCode 2.x (bundled by OpenChamber)
-  rejects 1.x-style plugins, so OpenChamber sessions don't drive the light yet. Event
-  names may also change between releases.
+- One OpenCode plugin file serves 1.x and 2.x. OpenCode 2.x's plugin API is new and
+  undocumented, so event names may change; its `blocked` mapping (`permission.asked`)
+  has not been verified live, and 2.x questions/forms are not mapped yet.
 - Detecting a denied Claude Code permission prompt relies on Claude's transcript
   format (a `system`/`turn_duration` entry), which isn't a documented interface.
 - `error` is detected automatically only for OpenCode (`session.error`). For Claude Code
