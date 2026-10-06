@@ -5,6 +5,7 @@ Usage:
   vibesignal status
   vibesignal clear [--agent A --session S]
   vibesignal off
+  vibesignal matter-config [--brightness PCT ...]
 
 The `event` command reads the session id from the hook's stdin JSON when
 `--session` is not given, and always exits 0 so a hook can never block the agent.
@@ -16,6 +17,7 @@ under a cross-process lock so concurrent hooks cannot race the device.
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import queue
@@ -111,6 +113,8 @@ def cmd_status(args) -> int:
         print(f"  {r['agent']}/{r['session']}: {r['state']} project={r['project']}")
     if not rows:
         print("  (no active sessions)")
+    matter_status = store.get_matter_status()
+    print(f"matter: color={matter_status.get('color')} error={matter_status.get('error') or 'none'}")
     return 0
 
 
@@ -163,6 +167,107 @@ def cmd_watch(args) -> int:
 def cmd_widget(args) -> int:
     from . import widget
     return widget.main(interval_ms=int(args.interval * 1000))
+
+
+def cmd_matter_sync(args) -> int:
+    from . import matter
+    return matter.run_sync(interval=args.interval, once=args.once)
+
+
+def _percent(value: str) -> int:
+    """argparse type: an integer brightness percentage from 1 to 100."""
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a whole number from 1 to 100, got {value!r}")
+    if not 1 <= number <= 100:
+        raise argparse.ArgumentTypeError(f"must be from 1 to 100, got {number}")
+    return number
+
+
+def _non_negative(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a whole number, got {value!r}")
+    if number < 0:
+        raise argparse.ArgumentTypeError(f"must be 0 or more, got {number}")
+    return number
+
+
+def _describe_matter(config) -> str:
+    return (
+        f"node={config.node_id} endpoint={config.endpoint_id} "
+        f"brightness={config.brightness_pct}% transition={config.transition_time / 10:g}s "
+        f"server={config.url}"
+    )
+
+
+def cmd_matter_config(args) -> int:
+    from dataclasses import replace
+
+    from .matter import load_config, save_config
+    if args.node is not None and args.node < 1:
+        raise SystemExit("vibesignal: --node must be a commissioned node id (1 or more)")
+    current = load_config()
+    updates = {
+        "url": args.url,
+        "node_id": args.node,
+        "endpoint_id": args.endpoint,
+        "transition_time": args.transition,
+        "brightness_pct": args.brightness,
+    }
+    config = replace(current, **{k: v for k, v in updates.items() if v is not None})
+    if args.clear_node:
+        config = replace(config, node_id=None)
+    # Saving also rewrites a legacy max/steady/pulse file in the new format.
+    # The running `matter-sync` worker re-reads this file on its next tick.
+    save_config(config)
+    if config.node_id is None:
+        store.set_matter_error(None)
+    print(f"[vibesignal] Matter {_describe_matter(config)}")
+    return 0
+
+
+def cmd_install_matter_autostart(args) -> int:
+    from . import installer
+    paths = installer.install_matter_autostart(interface=args.interface)
+    print("[vibesignal] installed Matter services:")
+    for path in paths:
+        print(f"  {path}")
+    print("Matter dashboard: http://127.0.0.1:5580")
+    return 0
+
+
+def cmd_uninstall_matter_autostart(args) -> int:
+    from . import installer
+    removed = installer.uninstall_matter_autostart()
+    print(f"[vibesignal] {'removed Matter services' if removed else 'no Matter services found'}")
+    return 0
+
+
+def cmd_matter_nodes(args) -> int:
+    from .matter import list_nodes, load_config
+    nodes = list_nodes(load_config())
+    if not nodes:
+        print("(no commissioned Matter nodes)")
+        return 0
+    for node in nodes:
+        print(json.dumps(node, indent=2, default=str))
+    return 0
+
+
+def cmd_matter_commission(args) -> int:
+    from dataclasses import replace
+
+    from .matter import commission, load_config, save_config
+    current = load_config()
+    code = args.code or getpass.getpass("Matter sharing/pairing code: ")
+    print("[vibesignal] commissioning Matter device; this may take up to 2 minutes...", flush=True)
+    node = commission(current, code, network_only=not args.ble)
+    save_config(replace(current, node_id=node, endpoint_id=args.endpoint))
+    print(f"[vibesignal] commissioned and selected Matter node {node}, endpoint {args.endpoint}")
+    return 0
 
 
 def cmd_install_launcher(args) -> int:
@@ -269,6 +374,45 @@ def main(argv: list | None = None) -> int:
     p_widget = sub.add_parser("widget", help="always-on-top floating GUI panel")
     p_widget.add_argument("--interval", type=float, default=1.0, help="refresh seconds")
     p_widget.set_defaults(func=cmd_widget)
+
+    p_matter_sync = sub.add_parser("matter-sync", help="mirror aggregate state to a Matter bulb")
+    p_matter_sync.add_argument("--interval", type=float, default=0.5)
+    p_matter_sync.add_argument("--once", action="store_true")
+    p_matter_sync.set_defaults(func=cmd_matter_sync)
+
+    p_matter_config = sub.add_parser(
+        "matter-config",
+        help="configure the Matter bulb target and brightness (unset flags keep their value)",
+    )
+    p_matter_config.add_argument("--url", default=None, help="Matter Server WebSocket URL")
+    p_matter_config.add_argument("--node", type=int, default=None, help="commissioned node id")
+    p_matter_config.add_argument("--clear-node", action="store_true", help="stop driving any bulb")
+    p_matter_config.add_argument("--endpoint", type=_non_negative, default=None, help="light endpoint (usually 1)")
+    p_matter_config.add_argument(
+        "--transition", type=_non_negative, default=None,
+        help="color/level transition in tenths of a second (default 3)",
+    )
+    p_matter_config.add_argument(
+        "--brightness", type=_percent, default=None, metavar="PERCENT",
+        help="constant bulb brightness for every active state, 1-100 percent",
+    )
+    p_matter_config.set_defaults(func=cmd_matter_config)
+
+    p_matter_nodes = sub.add_parser("matter-nodes", help="list commissioned Matter nodes")
+    p_matter_nodes.set_defaults(func=cmd_matter_nodes)
+
+    p_matter_commission = sub.add_parser("matter-commission", help="commission and select the bulb")
+    p_matter_commission.add_argument("--code", default=None, help="pairing code (omit for hidden prompt)")
+    p_matter_commission.add_argument("--endpoint", type=int, default=1)
+    p_matter_commission.add_argument("--ble", action="store_true", help="allow BLE commissioning")
+    p_matter_commission.set_defaults(func=cmd_matter_commission)
+
+    p_install_matter = sub.add_parser("install-matter-autostart", help="start Matter Server and bulb sync at login")
+    p_install_matter.add_argument("--interface", default="en0", help="primary network interface (default: en0)")
+    p_install_matter.set_defaults(func=cmd_install_matter_autostart)
+
+    p_uninstall_matter = sub.add_parser("uninstall-matter-autostart", help="remove Matter Server and sync services")
+    p_uninstall_matter.set_defaults(func=cmd_uninstall_matter_autostart)
 
     p_install_launcher = sub.add_parser(
         "install-launcher",

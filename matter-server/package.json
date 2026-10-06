@@ -1,0 +1,8 @@
+{
+  "name": "vibesignal-matter-runtime",
+  "private": true,
+  "description": "Pinned Matter controller runtime for VibeSignal",
+  "dependencies": {
+    "matter-server": "1.4.0"
+  }
+}

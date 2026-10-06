@@ -1,8 +1,8 @@
 """Per-session state storage with TTL-based staleness.
 
-State lives in a directory of small JSON files, one per (agent, session). There is
-no long-running process: every hook invocation reads the directory, recomputes,
-and writes back. Sessions that stop emitting events are dropped after the TTL, so a
+State lives in a directory of small JSON files, one per (agent, session). Hooks
+need no long-running process: every hook invocation reads the directory,
+recomputes, and writes back. Viewers and the optional Matter worker only read it. Sessions that stop emitting events are dropped after the TTL, so a
 crashed session cannot pin the light to a stale color.
 
 Writes are atomic (temp file plus os.replace) so a concurrent reader never sees a
@@ -135,3 +135,30 @@ def get_last_color() -> list | None:
 
 def set_last_color(color: list | None) -> None:
     _atomic_write(_last_color_path(), json.dumps({"color": color}))
+
+
+def _matter_status_path() -> Path:
+    return base_dir() / "matter_status.json"
+
+
+def get_matter_status() -> dict:
+    try:
+        data = json.loads(_matter_status_path().read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"color": None, "error": None}
+    return data if isinstance(data, dict) else {"color": None, "error": None}
+
+
+def _set_matter_status(**updates) -> None:
+    status = get_matter_status()
+    status.update(updates)
+    status["ts"] = time.time()
+    _atomic_write(_matter_status_path(), json.dumps(status))
+
+
+def set_matter_last_color(color: list | None) -> None:
+    _set_matter_status(color=color)
+
+
+def set_matter_error(error: str | None) -> None:
+    _set_matter_status(error=error)

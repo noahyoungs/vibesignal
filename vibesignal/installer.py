@@ -32,6 +32,8 @@ from pathlib import Path
 from . import lock
 
 LAUNCH_AGENT_LABEL = "io.github.yzhao062.vibesignal"
+MATTER_SERVER_LABEL = "io.github.yzhao062.vibesignal.matter-server"
+MATTER_SYNC_LABEL = "io.github.yzhao062.vibesignal.matter-sync"
 APP_NAME = "VibeSignal.app"
 SHORTCUT_NAME = "VibeSignal.lnk"
 
@@ -477,6 +479,69 @@ def uninstall_autostart() -> bool:
         return _windows_uninstall_autostart()
     _check_supported()
     return _macos_uninstall_autostart()
+
+
+def _service_plist(label: str, argv: list[str], stdout: Path, stderr: Path) -> str:
+    args_xml = "\n".join(
+        f"        <string>{xml.sax.saxutils.escape(part)}</string>" for part in argv
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<plist version="1.0"><dict>\n'
+        f'<key>Label</key><string>{label}</string>\n'
+        f'<key>ProgramArguments</key><array>\n{args_xml}\n</array>\n'
+        '<key>RunAtLoad</key><true/>\n<key>KeepAlive</key><true/>\n'
+        '<key>ThrottleInterval</key><integer>5</integer>\n'
+        f'<key>StandardOutPath</key><string>{xml.sax.saxutils.escape(str(stdout))}</string>\n'
+        f'<key>StandardErrorPath</key><string>{xml.sax.saxutils.escape(str(stderr))}</string>\n'
+        '</dict></plist>\n'
+    )
+
+
+def install_matter_autostart(interface: str = "en0") -> list[Path]:
+    """Install persistent Matter Server + VibeSignal sync LaunchAgents on macOS."""
+    _check_darwin()
+    project = Path(__file__).resolve().parent.parent
+    server = project / "matter-server" / "node_modules" / "matter-server" / "dist" / "esm" / "MatterServer.js"
+    node = shutil.which("node")
+    if not node or not server.exists():
+        raise SystemExit("vibesignal: Matter runtime missing; run `npm install --prefix matter-server` first")
+    base = Path.home() / ".vibesignal"
+    base.mkdir(parents=True, exist_ok=True)
+    specs = {
+        MATTER_SERVER_LABEL: [
+            node, str(server), "--storage-path", str(base / "matter-server"),
+            "--primary-interface", interface, "--listen-address", "127.0.0.1",
+            "--default-fabric-label", "VibeSignal", "--disable-thread-diagnostics",
+        ],
+        MATTER_SYNC_LABEL: [*vibesignal_args(), "matter-sync"],
+    }
+    agents = _launch_agents_dir()
+    agents.mkdir(parents=True, exist_ok=True)
+    target = _launchd_target()
+    written = []
+    for label, argv in specs.items():
+        path = agents / f"{label}.plist"
+        subprocess.run(["launchctl", "bootout", target, str(path)], check=False, capture_output=True)
+        path.write_text(_service_plist(label, argv, base / f"{label}.log", base / f"{label}.err"), encoding="utf-8")
+        subprocess.run(["launchctl", "bootstrap", target, str(path)], check=True)
+        written.append(path)
+    return written
+
+
+def uninstall_matter_autostart() -> bool:
+    _check_darwin()
+    removed = False
+    target = _launchd_target()
+    for label in (MATTER_SERVER_LABEL, MATTER_SYNC_LABEL):
+        path = _launch_agents_dir() / f"{label}.plist"
+        if path.exists():
+            subprocess.run(["launchctl", "bootout", target, str(path)], check=False, capture_output=True)
+            path.unlink()
+            removed = True
+    return removed
 
 
 # -- Agent hook installers (cross-platform) --------------------------------

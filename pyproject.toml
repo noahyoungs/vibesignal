@@ -1,7 +1,7 @@
 [project]
 name = "vibesignal"
 version = "0.1.2"
-description = "Physical status light for coding agents (Claude Code / Codex) via busylight"
+description = "Physical status light for coding agents (Claude Code / Codex / OpenCode)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
@@ -32,6 +32,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7", "build>=1.0", "twine>=5.0"]
 macos = ["pyobjc-framework-Cocoa>=10"]
+matter = ["websockets>=15,<17"]
 
 [project.scripts]
 vibesignal = "vibesignal.__main__:main"
