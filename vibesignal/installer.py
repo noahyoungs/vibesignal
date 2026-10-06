@@ -961,12 +961,13 @@ async function isSubagent(client, event, id) {{
   }}
   return ignored.has(id)
 }}
-function emit(command, state, id, cwd) {{
+function emit(command, state, id, cwd, at) {{
   if (!id) return
   const tail = command === "end"
     ? ["end", "--agent", "opencode", "--session", id, "--quiet"]
     : ["event", "--agent", "opencode", "--state", state, "--session", id,
-       "--project", cwd.split(/[\\\\/]/).filter(Boolean).at(-1) || "opencode", "--quiet"]
+       "--project", cwd.split(/[\\\\/]/).filter(Boolean).at(-1) || "opencode", "--quiet",
+       ...(at ? ["--ts", at.toFixed(6)] : [])]
   try {{
     const child = spawn(VIBESIGNAL[0], [...VIBESIGNAL.slice(1), ...tail], {{
       stdio: "ignore", detached: false, windowsHide: true,
@@ -980,6 +981,10 @@ export const VibeSignal = async (ctx) => {{
   const cwd = ctx.directory || ctx.worktree || process.cwd()
   return {{
     event: async ({{ event }}) => {{
+      // Stamp the event before any await: OpenCode delivers turn-end events
+      // (busy, idle, session.idle) within a few ms, and the spawned processes
+      // can finish out of order. --ts lets VibeSignal drop the stale ones.
+      const at = (performance.timeOrigin + performance.now()) / 1000
       const id = sessionID(event)
       const type = event?.type || ""
       if (!id) return
@@ -990,19 +995,19 @@ export const VibeSignal = async (ctx) => {{
       }}
       cleared.delete(id)
       if (type === "permission.asked" || type === "permission.updated" || type === "question.asked") {{
-        blocked.add(id); emit("event", "blocked", id, cwd); return
+        blocked.add(id); emit("event", "blocked", id, cwd, at); return
       }}
       if (type === "permission.replied" || type === "question.replied" || type === "question.rejected") {{
-        blocked.delete(id); emit("event", "working", id, cwd); return
+        blocked.delete(id); emit("event", "working", id, cwd, at); return
       }}
-      if (type === "session.error") {{ blocked.delete(id); emit("event", "error", id, cwd); return }}
+      if (type === "session.error") {{ blocked.delete(id); emit("event", "error", id, cwd, at); return }}
       if (type === "session.deleted") {{ blocked.delete(id); emit("end", "", id, cwd); return }}
       if (blocked.has(id)) return
-      if (type === "session.idle") {{ emit("event", "done", id, cwd); return }}
+      if (type === "session.idle") {{ emit("event", "done", id, cwd, at); return }}
       if (type === "session.status") {{
         const status = (event?.properties || event?.data)?.status?.type
-        if (status === "busy" || status === "retry") emit("event", "working", id, cwd)
-        else if (status === "idle") emit("event", "done", id, cwd)
+        if (status === "busy" || status === "retry") emit("event", "working", id, cwd, at)
+        else if (status === "idle") emit("event", "done", id, cwd, at)
       }}
     }},
   }}

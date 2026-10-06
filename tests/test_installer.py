@@ -713,6 +713,11 @@ def test_opencode_plugin_tracks_concurrent_session_events():
     assert "client.session.get" in source
     assert 'emit("end", "", id, cwd)' in source
     assert "/env/bin/vibesignal" in source
+    # Each event is stamped before any await so out-of-order processes
+    # cannot let a stale turn-end `working` overwrite `done`.
+    assert "performance.timeOrigin + performance.now()" in source
+    assert '"--ts", at.toFixed(6)' in source
+    assert 'emit("event", "done", id, cwd, at)' in source
     # Claude keeps the full Claude vocabulary and does NOT use PermissionRequest.
     claude = installer.agent_hooks_spec(["/env/bin/vibesignal"], "claude")
     assert "Notification" in claude and "SessionEnd" in claude

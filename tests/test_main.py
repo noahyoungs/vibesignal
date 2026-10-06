@@ -1,3 +1,4 @@
+import time
 import os
 import subprocess
 import sys
@@ -282,3 +283,32 @@ def test_install_autostart_no_launch_passes_launch_now_false(capsys, monkeypatch
     out = capsys.readouterr().out
     assert "next login" in out
     assert "starts now" not in out
+
+
+def _event(state, ts=None):
+    argv = ["event", "--agent", "opencode", "--session", "s1", "--state", state, "--quiet"]
+    return cli.main(argv + (["--ts", str(ts)] if ts is not None else []))
+
+
+def test_event_ts_drops_stale_event_finishing_last(tmp_path, monkeypatch):
+    # OpenCode fires busy -> idle -> session.idle within ms, one process each;
+    # the stale `working` can finish last. Its older --ts must not win.
+    monkeypatch.setenv("VIBECODING_SIGNAL_DIR", str(tmp_path))
+    monkeypatch.setattr(cli.light, "set_color", lambda rgb: False)
+    monkeypatch.setattr(cli, "_read_hook_stdin", lambda: {})
+    now = time.time()
+    _event("done", ts=now + 0.002)      # idle processes finish first
+    _event("done", ts=now + 0.002)
+    _event("working", ts=now)           # busy process finishes last
+    assert store.read_session("opencode", "s1")["state"] == "done"
+    _event("working", ts=now + 5)       # a genuinely newer event still applies
+    assert store.read_session("opencode", "s1")["state"] == "working"
+
+
+def test_event_without_ts_always_records(tmp_path, monkeypatch):
+    monkeypatch.setenv("VIBECODING_SIGNAL_DIR", str(tmp_path))
+    monkeypatch.setattr(cli.light, "set_color", lambda rgb: False)
+    monkeypatch.setattr(cli, "_read_hook_stdin", lambda: {})
+    _event("done", ts=time.time() + 60)
+    _event("working")                   # hooks without --ts keep last-writer-wins
+    assert store.read_session("opencode", "s1")["state"] == "working"

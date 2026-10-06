@@ -76,6 +76,10 @@ def record(agent: str, session: str, state: str, project: str | None = None,
     _atomic_write(_session_path(agent, session), json.dumps(payload))
 
 
+def read_session(agent: str, session: str) -> dict | None:
+    return _read_state_file(_session_path(agent, session))
+
+
 def _read_state_file(path: Path) -> dict | None:
     """Read one session file, returning a dict or None. Tolerates a missing file,
     invalid JSON, or valid JSON of the wrong shape (e.g. a list), so a single

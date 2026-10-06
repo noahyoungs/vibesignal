@@ -92,7 +92,15 @@ def cmd_event(args) -> int:
         cwd = str(hook.get("cwd") or os.getcwd())
         project = args.project or os.path.basename(cwd.rstrip("/\\")) or None
         with lock.file_lock(store.lock_path()):
-            store.record(agent=args.agent, session=session, state=args.state, project=project)
+            # A source that fires several events at once (OpenCode spawns one
+            # process per event) passes --ts with the time each event happened.
+            # Processes can finish in any order, so an event older than the
+            # session's current record is stale and must not overwrite it.
+            previous = store.read_session(args.agent, session) if args.ts else None
+            prev_ts = (previous or {}).get("ts")
+            if not (isinstance(prev_ts, (int, float)) and prev_ts > args.ts):
+                store.record(agent=args.agent, session=session, state=args.state,
+                             project=project, now=args.ts)
             state, color = _apply_light()
         # --quiet keeps stdout empty for hosts that parse hook stdout as JSON
         # (Codex rejects a plain status line from a PostToolUse hook).
@@ -406,6 +414,10 @@ def main(argv: list | None = None) -> int:
     )
     p_event.add_argument("--session", default=None, help="session id (else from hook stdin)")
     p_event.add_argument("--project", default=None, help="project tag (else from cwd)")
+    p_event.add_argument(
+        "--ts", type=float, default=None,
+        help="event time (epoch seconds); an event older than the session's record is ignored",
+    )
     p_event.add_argument("--quiet", action="store_true", help="suppress normal stdout for strict hook parsers")
     p_event.set_defaults(func=cmd_event)
 
