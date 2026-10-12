@@ -28,12 +28,35 @@ def test_state_hex_uses_resolved_color_and_grey_for_idle():
     assert widget.state_hex(None) == widget._IDLE
 
 
+def test_mono_family_per_platform(monkeypatch):
+    monkeypatch.setattr("sys.platform", "win32")
+    assert widget._mono_family() == "Consolas"
+    monkeypatch.setattr("sys.platform", "darwin")
+    assert widget._mono_family() == "Menlo"
+    monkeypatch.setattr("sys.platform", "linux")
+    assert widget._mono_family() == "DejaVu Sans Mono"
+
+
 def test_alarm_palette_follows_configured_color_and_stays_legible():
     dark = widget._palette("blocked", [220, 38, 38])
     assert dark["alarm"] and dark["frame"] == "#dc2626" and dark["header_fg"] == "#ffffff"
     light = widget._palette("blocked", [232, 192, 0])  # warm-theme gold
-    assert light["header_fg"] == widget._HEADER  # dark text on a light header
+    assert light["header_fg"] == widget._INK  # dark text on a light header
+    from vibesignal import colors
+    for state in ("blocked", "error"):  # calm pastels also take dark text
+        rgb = colors.hex_to_rgb(colors.DEFAULT_COLORS[state])
+        pal = widget._palette(state, rgb)
+        assert pal["frame"] == colors.DEFAULT_COLORS[state].lower()
+        assert pal["header_fg"] == widget._INK
     assert widget._palette("working", [0, 200, 60]) is widget._CALM
+
+
+def test_screen_text_per_state():
+    assert widget.screen_text("blocked") == ("needs you", "waiting on you")
+    assert widget.screen_text("done")[0] == "done"
+    assert widget.screen_text("working")[0] == "working"
+    assert widget.screen_text("idle")[0] == "all quiet"
+    assert widget.screen_text("unknown") == widget.screen_text("idle")
 
 
 def test_row_fields_blocked():
@@ -86,6 +109,12 @@ def test_widget_constructs_and_renders_one_tick(monkeypatch):
         assert "blocked" in texts  # state
         # Whole-panel alarm: a blocked aggregate turns the frame red.
         assert str(w.root.cget("bg")) == "#dc2626"
+        # The status screen shows the aggregate state with the configured color.
+        items = w.screen.find_all()
+        screen_texts = [w.screen.itemcget(i, "text") for i in items if w.screen.type(i) == "text"]
+        assert "needs you" in screen_texts
+        fills = {w.screen.itemcget(i, "fill") for i in items if w.screen.type(i) == "oval"}
+        assert "#dc2626" in fills
     finally:
         w.root.destroy()
 

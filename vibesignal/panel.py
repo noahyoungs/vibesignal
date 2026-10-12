@@ -13,14 +13,15 @@ import time
 from . import resolve
 
 _RESET = "\033[0m"
-# Basic 16-color ANSI approximating the default hues. Not tied to the configured
-# mapping: 24-bit color is not reliable across terminals, and the glyph and state
-# name already carry the meaning.
+# Basic 16-color ANSI approximating the default (calm) hues. Not tied to the
+# configured mapping: 24-bit color is not reliable across terminals, and the glyph
+# and state name already carry the meaning. The bright variants read softer than
+# the plain ones in most terminal themes.
 _ANSI = {
-    "working": "\033[32m",  # green
-    "blocked": "\033[31m",  # red
-    "done": "\033[34m",     # blue
-    "error": "\033[35m",    # magenta (violet)
+    "working": "\033[36m",  # cyan (ocean teal)
+    "blocked": "\033[91m",  # bright red (dawn rose)
+    "done": "\033[94m",     # bright blue (night periwinkle)
+    "error": "\033[95m",    # bright magenta (night orchid)
     "idle": "\033[90m",
 }
 _GLYPH = {"working": ".", "blocked": "*", "done": "o", "error": "x", "idle": "-"}

@@ -64,7 +64,7 @@ def test_apply_light_does_not_cache_on_failed_write(tmp_path, monkeypatch):
     store.record("claude", "s1", "working")
     assert store.get_last_color() is None
     state, color = cli._apply_light()
-    assert color == [0, 200, 60]            # working -> green
+    assert color == [92, 204, 185]          # working -> ocean teal
     assert store.get_last_color() is None   # not cached, because the write failed
 
 
@@ -73,7 +73,7 @@ def test_apply_light_caches_on_success(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.light, "set_color", lambda rgb: True)  # simulate a device
     store.record("claude", "s1", "working")
     cli._apply_light()
-    assert store.get_last_color() == [0, 200, 60]
+    assert store.get_last_color() == [92, 204, 185]
 
 
 def test_off_does_not_cache_on_failed_write(tmp_path, monkeypatch):

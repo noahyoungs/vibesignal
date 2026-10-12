@@ -2,90 +2,99 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>vibesignal widget mockup</title>
+<title>vibesignal widget mockup (calm theme)</title>
+<!-- A static HTML mockup of vibesignal/widget.py in the calm theme, generated from
+     its constants and color helpers with the default palette. It approximates the
+     Tk window; it is not a capture of it. The backdrop is calm-chords' dawn sky
+     (#fbd3c4 #f7b7c8 #c9b6f0 #9fc3ef) with its ink #3b2f4a for captions. -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { background: #ffffff; }
-  /* The screenshot is clipped to #stage, so its padding + gradient is the frame. */
+  /* Screenshots clip to #stage (all three cards) or to one .col. */
   #stage {
     display: inline-flex;
-    align-items: center;
-    gap: 60px;
+    align-items: flex-start;
+    gap: 40px;
     padding: 46px 52px;
-    background: linear-gradient(135deg, #eef1f6 0%, #e2e7f0 100%);
+    background: linear-gradient(160deg, #fbd3c4 0%, #f7b7c8 34%, #c9b6f0 68%, #9fc3ef 100%);
     font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .col { display: flex; flex-direction: column; align-items: center; gap: 15px; }
-  .cap { font-size: 13px; color: #5b626d; font-weight: 500; letter-spacing: .2px; }
-  .cap b { color: #272b31; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 15px; padding: 6px; }
+  .cap { font: 500 13px ui-rounded, "SF Pro Rounded", system-ui, sans-serif; color: #3b2f4a; letter-spacing: .2px; }
+  .cap b { color: #3b2f4a; }
 
-  /* ---- widget card (faithful to vibesignal/widget.py) ---- */
-  .card {
-    width: 300px;
-    border-radius: 11px;
-    overflow: hidden;
-    border: 1px solid #c9ced8;
-    box-shadow: 0 14px 32px rgba(30, 38, 55, .18), 0 2px 6px rgba(30, 38, 55, .10);
+  /* ---- widget card (generated from vibesignal/widget.py) ---- */
+  .card { width: 312px; border-radius: 12px; overflow: hidden; }
+  .hdr { display: flex; align-items: center; gap: 6px; padding: 8px 13px 6px; }
+  .dot { font-size: 13px; line-height: 1; }
+  .ttl { font-size: 13px; font-weight: 700; }
+  .cnt { margin-left: auto; font-size: 11px; }
+  .screen {
+    display: flex; align-items: center; gap: 12px;
+    margin: 2px 10px 10px; height: 44px; padding: 0 14px 0 18px;
+    border: 1px solid; border-radius: 10px;
   }
-  .card.alarm {
-    border-color: #dc2626;
-    box-shadow: 0 14px 36px rgba(220, 38, 38, .30), 0 2px 6px rgba(220, 38, 38, .16);
-  }
-
-  .hdr { display: flex; align-items: center; gap: 6px; padding: 7px 13px; background: #e9ecf1; }
-  .card.alarm .hdr { background: #dc2626; }
-  .dot { font-size: 13px; line-height: 1; color: #2563eb; }      /* calm aggregate = done (blue) */
-  .card.alarm .dot { color: #ffffff; }
-  .ttl { font-size: 13px; font-weight: 700; color: #2b3038; }
-  .card.alarm .ttl { color: #ffffff; }
-  .cnt { margin-left: auto; font-size: 11px; color: #959ba4; }
-  .card.alarm .cnt { color: #ffffff; }
-
-  .rule { height: 1px; background: #d6dae1; }
-  .card.alarm .rule { background: #dc2626; }
-
-  .body { padding: 7px 13px 10px; background: #e9ecf1; }
-  .card.alarm .body { background: #fdecec; }
-
+  .lamp { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .stitle { font: 700 16px Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+  .hint { margin-left: auto; font: 11px Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+  .rule { height: 1px; margin: 0 11px; }
+  .body { padding: 8px 13px 11px; }
   .row { display: grid; grid-template-columns: 4px 1fr 52px 58px 46px; align-items: center; gap: 9px; padding: 3px 0; }
   .bar { width: 4px; height: 15px; border-radius: 2px; }
-  .proj { font-size: 13px; color: #272b31; }
-  .agent { font-size: 11px; color: #6b7280; }
-  .state { font-size: 11px; }
-  .age { font-size: 11px; color: #959ba4; text-align: right; }
+  .proj { font-size: 13px; }
+  .agent, .state, .age { font-size: 11px; }
+  .age { text-align: right; }
 </style>
 </head>
 <body>
 <div id="stage">
-
   <div class="col">
-    <div class="card">
-      <div class="hdr"><span class="dot">&#9679;</span><span class="ttl">vibesignal</span><span class="cnt">3</span></div>
-      <div class="rule"></div>
+    <div class="card" id="card-working" style="border:1px solid #3a3f6e;background:#23264a;box-shadow:0 14px 32px rgba(16,26,58,.35)">
+      <div class="hdr" style="background:#23264a"><span class="dot" style="color:#5cccb9">&#9679;</span><span class="ttl" style="color:#dfe3ff">vibesignal</span><span class="cnt" style="color:#8184a4">2</span></div>
+      <div class="screen" style="background:#101a3a;border-color:#2c2560">
+        <span class="lamp" style="background:#5cccb9;box-shadow:0 0 0 4px #274f60"></span>
+        <span class="stitle" style="color:#7dd6c7">working</span><span class="hint" style="color:#8184a4">agents busy</span>
+      </div>
+      <div class="rule" style="background:#2c2560"></div>
       <div class="body">
-        <div class="row"><div class="bar" style="background:#16a34a"></div><div class="proj">pyod</div><div class="agent">claude</div><div class="state" style="color:#16a34a">working</div><div class="age">&mdash;</div></div>
-        <div class="row"><div class="bar" style="background:#2563eb"></div><div class="proj">iet-paper</div><div class="agent">codex</div><div class="state" style="color:#2563eb">done</div><div class="age">3s</div></div>
-        <div class="row"><div class="bar" style="background:#16a34a"></div><div class="proj">random</div><div class="agent">claude</div><div class="state" style="color:#16a34a">working</div><div class="age">&mdash;</div></div>
+        <div class="row"><div class="bar" style="background:#5cccb9"></div><div class="proj" style="color:#dfe3ff">pyod</div><div class="agent" style="color:#a7aac9">claude</div><div class="state" style="color:#7dd6c7">working</div><div class="age" style="color:#8184a4">&mdash;</div></div>
+        <div class="row"><div class="bar" style="background:#5cccb9"></div><div class="proj" style="color:#dfe3ff">random</div><div class="agent" style="color:#a7aac9">codex</div><div class="state" style="color:#7dd6c7">working</div><div class="age" style="color:#8184a4">&mdash;</div></div>
       </div>
     </div>
-    <div class="cap"><b>calm</b> &middot; agents working, nothing needs you</div>
+    <div class="cap"><b>working</b> &middot; agents busy, nothing needs you</div>
   </div>
-
   <div class="col">
-    <div class="card alarm">
-      <div class="hdr"><span class="dot">&#9679;</span><span class="ttl">vibesignal</span><span class="cnt">4</span></div>
-      <div class="rule"></div>
+    <div class="card" id="card-needs-you" style="border:3px solid #f07d9b;background:#443457;box-shadow:0 14px 36px rgba(240,125,155,.35)">
+      <div class="hdr" style="background:#f07d9b"><span class="dot" style="color:#3b2f4a">&#9679;</span><span class="ttl" style="color:#3b2f4a">vibesignal</span><span class="cnt" style="color:#3b2f4a">3</span></div>
+      <div class="screen" style="background:#262444;border-color:#2c2560">
+        <span class="lamp" style="background:#f07d9b;box-shadow:0 0 0 4px #633f5e"></span>
+        <span class="stitle" style="color:#f397af">needs you</span><span class="hint" style="color:#8184a4">waiting on you</span>
+      </div>
+      <div class="rule" style="background:#f07d9b"></div>
       <div class="body">
-        <div class="row"><div class="bar" style="background:#dc2626"></div><div class="proj">aegis</div><div class="agent">claude</div><div class="state" style="color:#dc2626">blocked</div><div class="age">1m12s</div></div>
-        <div class="row"><div class="bar" style="background:#dc2626"></div><div class="proj">agent-audit</div><div class="agent">codex</div><div class="state" style="color:#dc2626">blocked</div><div class="age">8s</div></div>
-        <div class="row"><div class="bar" style="background:#2563eb"></div><div class="proj">iet-paper</div><div class="agent">claude</div><div class="state" style="color:#2563eb">done</div><div class="age">3s</div></div>
-        <div class="row"><div class="bar" style="background:#16a34a"></div><div class="proj">random</div><div class="agent">claude</div><div class="state" style="color:#16a34a">working</div><div class="age">&mdash;</div></div>
+        <div class="row"><div class="bar" style="background:#f07d9b"></div><div class="proj" style="color:#dfe3ff">aegis</div><div class="agent" style="color:#a7aac9">claude</div><div class="state" style="color:#f397af">blocked</div><div class="age" style="color:#8184a4">1m12s</div></div>
+        <div class="row"><div class="bar" style="background:#8b84f0"></div><div class="proj" style="color:#dfe3ff">iet-paper</div><div class="agent" style="color:#a7aac9">codex</div><div class="state" style="color:#a29df3">done</div><div class="age" style="color:#8184a4">3s</div></div>
+        <div class="row"><div class="bar" style="background:#5cccb9"></div><div class="proj" style="color:#dfe3ff">random</div><div class="agent" style="color:#a7aac9">claude</div><div class="state" style="color:#7dd6c7">working</div><div class="age" style="color:#8184a4">&mdash;</div></div>
       </div>
     </div>
-    <div class="cap"><b style="color:#dc2626">blocked</b> &middot; one session waits &rarr; the panel turns red</div>
+    <div class="cap"><b>needs you</b> &middot; one session waits &rarr; the card takes the blocked color</div>
   </div>
-
+  <div class="col">
+    <div class="card" id="card-done" style="border:1px solid #3a3f6e;background:#23264a;box-shadow:0 14px 32px rgba(16,26,58,.35)">
+      <div class="hdr" style="background:#23264a"><span class="dot" style="color:#8b84f0">&#9679;</span><span class="ttl" style="color:#dfe3ff">vibesignal</span><span class="cnt" style="color:#8184a4">2</span></div>
+      <div class="screen" style="background:#101a3a;border-color:#2c2560">
+        <span class="lamp" style="background:#8b84f0;box-shadow:0 0 0 4px #353a71"></span>
+        <span class="stitle" style="color:#a29df3">done</span><span class="hint" style="color:#8184a4">your move</span>
+      </div>
+      <div class="rule" style="background:#2c2560"></div>
+      <div class="body">
+        <div class="row"><div class="bar" style="background:#8b84f0"></div><div class="proj" style="color:#dfe3ff">iet-paper</div><div class="agent" style="color:#a7aac9">claude</div><div class="state" style="color:#a29df3">done</div><div class="age" style="color:#8184a4">3s</div></div>
+        <div class="row"><div class="bar" style="background:#5cccb9"></div><div class="proj" style="color:#dfe3ff">pyod</div><div class="agent" style="color:#a7aac9">codex</div><div class="state" style="color:#7dd6c7">working</div><div class="age" style="color:#8184a4">&mdash;</div></div>
+      </div>
+    </div>
+    <div class="cap"><b>done</b> &middot; a turn finished; your move</div>
+  </div>
 </div>
 </body>
 </html>
