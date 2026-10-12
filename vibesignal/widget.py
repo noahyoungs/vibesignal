@@ -10,7 +10,7 @@ Run with:
   Windows:        pythonw -m vibesignal widget    (no console window)
   macOS / Linux:  vibesignal widget &        (background the GUI)
 
-Drag by the header or the status screen; right-click to quit. On macOS, Control-click works too
+Drag by the header; right-click to quit. On macOS, Control-click works too
 because some Tk builds report the right mouse button as Button-2 rather than
 Button-3, and Control-click is the historical single-button right-click chord.
 """
@@ -39,46 +39,21 @@ def _font_family() -> str:
         return "Segoe UI"
     return "DejaVu Sans"
 
-
-def _mono_family() -> str:
-    """Per-platform monospace family for the small status screen."""
-    if sys.platform == "darwin":
-        return "Menlo"
-    if sys.platform == "win32":
-        return "Consolas"
-    return "DejaVu Sans Mono"
-
-# Calm night theme, after calm-chords' deep-night mood (src/moods.ts): a body-
-# colored card with a small, rounded inset screen showing the aggregate state,
-# and a left accent bar per row. Every state color comes from the configured
-# mapping (colors.py), so the widget matches the light/bulb.
-_BORDER = "#3a3f6e"  # night body, light
-_BG = "#23264a"      # night body, dark: the card
-_SCREEN = "#101a3a"  # night sky, deepest: the inset status screen
-_SCREEN_EDGE = "#2c2560"  # night sky, violet
-_RULE = "#2c2560"
-_FG = "#dfe3ff"      # night ink
-_HEADER = "#dfe3ff"
-_DIM = "#a7aac9"     # night ink 30% toward the card
-_DIMMER = "#8184a4"  # night ink 50% toward the card
-_IDLE = "#7675a4"    # night screen #c8c4ff 50% toward the card: idle has no
-                     # configured color (the light is off)
-_INK = "#3b2f4a"     # dawn ink: dark text on a light (pastel) alarm header
+# Soft light theme. A left accent bar per row carries the state color, which comes
+# from the configured mapping (colors.py) so the widget matches the light/bulb.
+_IDLE = "#9ca3af"    # grey: idle has no configured color (the light is off)
+_BORDER = "#c9ced8"
+_BG = "#e9ecf1"      # soft cool grey card (calmer than stark white)
+_FG = "#272b31"
+_DIM = "#6b7280"
+_DIMMER = "#959ba4"
+_RULE = "#d6dae1"
+_HEADER = "#2b3038"
 
 # When a session needs you, the whole panel takes the blocked (or error) color,
 # not just one row, so a blocked session is unmissable across several windows.
-# Other states keep the calm night chrome.
-_CALM = {"frame": _BORDER, "header_bg": _BG, "header_fg": _HEADER, "wash": _BG,
-         "screen": _SCREEN, "alarm": False}
-
-# What the status screen says for each aggregate state: (title, hint).
-_SCREEN_TEXT = {
-    "blocked": ("needs you", "waiting on you"),
-    "error": ("error", "a session failed"),
-    "done": ("done", "your move"),
-    "working": ("working", "agents busy"),
-    "idle": ("all quiet", "nothing live"),
-}
+# Other states keep the calm grey chrome.
+_CALM = {"frame": _BORDER, "header_bg": _BG, "header_fg": _HEADER, "wash": _BG, "alarm": False}
 
 
 def _mix(rgb, toward, amount: float) -> str:
@@ -94,43 +69,18 @@ def state_hex(rgb) -> str:
 
 
 def text_hex(rgb) -> str:
-    """A lighter shade of the state color, readable as text on the night card."""
-    return _mix(rgb, (255, 255, 255), 0.2) if rgb else _IDLE
-
-
-def screen_text(agg: str) -> tuple[str, str]:
-    """Pure helper: (title, hint) for the status screen."""
-    return _SCREEN_TEXT.get(agg, _SCREEN_TEXT["idle"])
-
-
-def _luminance(rgb) -> float:
-    """WCAG relative luminance of an sRGB color (0 = black, 1 = white)."""
-    def channel(v):
-        v /= 255
-        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
-    r, g, b = (channel(v) for v in rgb)
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    """A darker shade of the state color, readable as text on the light card."""
+    return _mix(rgb, (0, 0, 0), 0.25) if rgb else _IDLE
 
 
 def _palette(agg: str, rgb) -> dict:
     if agg in ("blocked", "error") and rgb:
-        # Header text is white or ink, whichever contrasts more with the color,
-        # so pastel and vivid custom colors both stay legible.
-        bg = _luminance(rgb)
-        on_white = 1.05 / (bg + 0.05)
-        on_ink = (bg + 0.05) / (_luminance(colors.hex_to_rgb(_INK)) + 0.05)
+        r, g, b = rgb
+        light_bg = 0.299 * r + 0.587 * g + 0.114 * b > 160
         return {"frame": state_hex(rgb), "header_bg": state_hex(rgb),
-                "header_fg": _INK if on_ink > on_white else "#ffffff",
-                "wash": _mix(rgb, colors.hex_to_rgb(_BG), 0.84),
-                "screen": _mix(rgb, colors.hex_to_rgb(_SCREEN), 0.9), "alarm": True}
+                "header_fg": _HEADER if light_bg else "#ffffff",
+                "wash": _mix(rgb, (255, 255, 255), 0.9), "alarm": True}
     return _CALM
-
-
-def _round_rect(canvas, x1, y1, x2, y2, r, **kw):
-    """A rounded rectangle on a Tk canvas (a smoothed polygon)."""
-    points = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
-              x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
-    return canvas.create_polygon(points, smooth=True, **kw)
 
 
 def glyph(state: str) -> str:
@@ -170,7 +120,7 @@ class Widget:
             self.root.attributes("-alpha", 0.97)
         except tk.TclError:
             pass
-        # The root acts as a 1px border so the panel reads on any desktop.
+        # The root acts as a 1px border so the panel reads on a light desktop.
         self.root.configure(bg=_BORDER)
         self.card = tk.Frame(self.root, bg=_BG)
         self.card.pack(fill="both", expand=True, padx=1, pady=1)
@@ -180,12 +130,9 @@ class Widget:
         self._f_proj = tkfont.Font(family=fam, size=9)
         self._f_dim = tkfont.Font(family=fam, size=8)
         self._f_dot = tkfont.Font(family=fam, size=10)
-        mono = _mono_family()
-        self._f_screen = tkfont.Font(family=mono, size=12, weight="bold")
-        self._f_hint = tkfont.Font(family=mono, size=8)
 
         self.header = tk.Frame(self.card, bg=_BG)
-        self.header.pack(fill="x", padx=11, pady=(6, 4))
+        self.header.pack(fill="x", padx=11, pady=(5, 4))
         self._agg_dot = tk.Label(self.header, text="●", bg=_BG, fg=_DIMMER, font=self._f_dot)
         self._agg_dot.pack(side="left")
         self._title = tk.Label(self.header, text=" vibesignal", bg=_BG, fg=_HEADER,
@@ -194,27 +141,18 @@ class Widget:
         self._count = tk.Label(self.header, text="", bg=_BG, fg=_DIMMER, font=self._f_dim)
         self._count.pack(side="right")
 
-        # The small status screen: a rounded inset display with a soft dot and
-        # the aggregate state, redrawn each tick and on resize.
-        self.screen = tk.Canvas(self.card, width=280, height=44, bg=_BG,
-                                highlightthickness=0, bd=0)
-        self.screen.pack(fill="x", padx=10, pady=(2, 8))
-        self.screen.bind("<Configure>", lambda _e: self._draw_screen())
-        self._screen_view = ("idle", None, _CALM)
-
         self._rule = tk.Frame(self.card, bg=_RULE, height=1)
         self._rule.pack(fill="x", padx=11)
 
         self.body = tk.Frame(self.card, bg=_BG)
-        self.body.pack(fill="both", expand=True, padx=(8, 12), pady=(6, 9))
+        self.body.pack(fill="both", expand=True, padx=(8, 12), pady=(5, 8))
         self.body.grid_columnconfigure(0, minsize=4)              # accent bar
         self.body.grid_columnconfigure(1, minsize=118, weight=1)  # project
         self.body.grid_columnconfigure(2, minsize=46)             # agent
         self.body.grid_columnconfigure(3, minsize=54)             # state
         self.body.grid_columnconfigure(4, minsize=40)             # age
 
-        for w in (self.root, self.card, self.header, self._agg_dot, self._title, self._count,
-                  self.screen):
+        for w in (self.root, self.card, self.header, self._agg_dot, self._title, self._count):
             w.bind("<Button-1>", self._start_drag)
             w.bind("<B1-Motion>", self._on_drag)
             w.bind("<Button-3>", self._menu)
@@ -400,24 +338,6 @@ class Widget:
         except Exception:
             return False
 
-    def _draw_screen(self):
-        agg, rgb, pal = self._screen_view
-        c = self.screen
-        c.delete("all")
-        c.configure(bg=pal["wash"])
-        width = c.winfo_width() if c.winfo_width() > 1 else int(c.cget("width"))
-        height = int(c.cget("height"))
-        _round_rect(c, 1, 1, width - 2, height - 2, 10, fill=pal["screen"], outline=_SCREEN_EDGE)
-        mid = height // 2
-        if rgb:  # a soft halo behind the dot, like a lit indicator
-            halo = _mix(rgb, colors.hex_to_rgb(pal["screen"]), 0.7)
-            c.create_oval(13, mid - 9, 31, mid + 9, fill=halo, outline="")
-        c.create_oval(17, mid - 5, 27, mid + 5, fill=state_hex(rgb), outline="")
-        title, hint = screen_text(agg)
-        c.create_text(41, mid, text=title, anchor="w", font=self._f_screen,
-                      fill=text_hex(rgb) if rgb else _DIM)
-        c.create_text(width - 14, mid, text=hint, anchor="e", font=self._f_hint, fill=_DIMMER)
-
     def _tick(self):
         rows = resolve.resolve_per_session()
         agg, agg_color = resolve.resolve_color()
@@ -439,8 +359,6 @@ class Widget:
         self._agg_dot.configure(bg=hbg, fg=(pal["header_fg"] if pal["alarm"] else state_hex(agg_color)))
         self._count.configure(text=(f"{len(rows)}" if rows else ""), bg=hbg,
                               fg=(pal["header_fg"] if pal["alarm"] else _DIMMER))
-        self._screen_view = (agg, agg_color, pal)
-        self._draw_screen()
 
         for w in self._cells:
             w.destroy()

@@ -78,10 +78,7 @@ def test_every_theme_and_state_commands_the_same_level():
             levels.add(_level(sent))
             hues.add(_hue_sat(sent))
     assert levels == {matter.brightness_level(40)}
-    # Every distinct color across the themes is a distinct hue/sat (calm is an
-    # alias of default, so it adds none).
-    distinct = {value for theme in colors.THEMES.values() for value in theme.values()}
-    assert len(hues) == len(distinct) == 16
+    assert len(hues) == 16  # every state in every theme is a distinct hue/sat
 
 
 def test_brightness_level_range():

@@ -42,10 +42,9 @@ def test_render_colors_blocked_and_done_distinctly():
          "state": "done", "color": [0, 90, 255], "ts": 1001.0},
     ]
     out = panel.render(rows, now=1002.0, color=True)
-    # Lock rose-blocked / periwinkle-done ANSI so the panel matches the light's hues.
-    assert panel._ANSI["blocked"] == "\033[91m"
-    assert panel._ANSI["done"] == "\033[94m"
-    assert len(set(panel._ANSI.values())) == len(panel._ANSI)  # every state distinct
+    # Lock red-blocked / blue-done ANSI so the panel matches the light's hues.
+    assert panel._ANSI["blocked"] == "\033[31m"
+    assert panel._ANSI["done"] == "\033[34m"
     assert panel._ANSI["blocked"] in out
     assert panel._ANSI["done"] in out
     # The blocked row is painted and ordered before the done row.

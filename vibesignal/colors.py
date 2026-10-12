@@ -5,7 +5,7 @@ configurable. Colors persist in ``~/.vibesignal/colors.json`` using the same
 versioned document that ``vibesignal config --export-colors`` writes, so an
 exported file and the saved configuration are interchangeable:
 
-    {"schema_version": 1, "colors": {"working": "#5CCCB9", ...}}
+    {"schema_version": 1, "colors": {"working": "#00C83C", ...}}
 
 Readers are tolerant (a missing or corrupt file falls back to the defaults per
 state, so a hook or the Matter worker never crashes on a bad edit). Writers are
@@ -27,34 +27,22 @@ SCHEMA_VERSION = 1
 # Active states, in aggregate priority order (highest first) for display.
 ACTIVE_STATES = ("blocked", "error", "done", "working")
 
-# The calm palette, after calm-chords (src/style.css, src/moods.ts). Each color
-# keeps the hue of a calm-chords tone and only deepens its saturation:
-#   working: ocean screen #a8fff0 (170 deg, s 0.34)
-#   blocked: dawn sky rose #f7b7c8 (344 deg, s 0.26)
-#   done:    deep-night screen #c8c4ff (244 deg, s 0.23); the dawn periwinkle
-#            #9fc3ef (213 deg) would sit only 43 deg from working
-#   error:   deep-night chord hue 290 (orchid lavender)
-# Soft on screen, but still a bulb signal: a Matter bulb sees only hue and
-# saturation, so working/blocked/done stay >= 60 degrees apart in hue, error is
-# >= 30 degrees from blocked, and every saturation is >= 0.35 so nothing washes
-# out to white (tests/test_colors.py holds these limits).
 DEFAULT_COLORS = {
-    "working": "#5CCCB9",  # ocean teal
-    "blocked": "#F07D9B",  # dawn rose: needs you now
-    "done": "#8B84F0",     # night periwinkle: your move
-    "error": "#D585E6",    # night orchid: failure, distinct from blocked
+    "working": "#00C83C",  # green
+    "blocked": "#DC2626",  # red: needs you now
+    "done": "#005AFF",     # blue: your move
+    "error": "#9333EA",    # violet: failure, distinct from blocked
 }
 
 # Built-in presets. A Matter bulb only takes hue and saturation from these;
 # brightness is configured separately (`vibesignal matter-config --brightness`).
 THEMES = {
     "default": dict(DEFAULT_COLORS),
-    "calm": dict(DEFAULT_COLORS),  # the calm palette is the default; kept as a name
-    "classic": {  # the original vivid defaults: green, red, blue, violet
-        "working": "#00C83C",
-        "blocked": "#DC2626",
-        "done": "#005AFF",
-        "error": "#9333EA",
+    "calm": {  # softer, lower-saturation versions of the default hues
+        "working": "#6DBE8C",
+        "blocked": "#E07A72",
+        "done": "#6F9EE0",
+        "error": "#A88BDB",
     },
     "warm": {  # gold, orange, rose-red, magenta
         "working": "#E8C000",
@@ -86,7 +74,7 @@ def parse_hex(value: object, state: str) -> str:
     match = _HEX.fullmatch(value.strip()) if isinstance(value, str) else None
     if match is None:
         raise ColorConfigError(
-            f"invalid color {value!r} for {state}: expected a hex color like #5CCCB9"
+            f"invalid color {value!r} for {state}: expected a hex color like #00C83C"
         )
     normalized = "#" + match.group(1).upper()
     if normalized == "#000000":

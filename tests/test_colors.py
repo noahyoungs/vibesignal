@@ -24,7 +24,7 @@ def _doc(**overrides):
 
 def test_defaults_match_documented_colors(state_dir):
     assert colors.load_colors() == {
-        "working": "#5CCCB9", "blocked": "#F07D9B", "done": "#8B84F0", "error": "#D585E6",
+        "working": "#00C83C", "blocked": "#DC2626", "done": "#005AFF", "error": "#9333EA",
     }
     assert colors.load_rgb()["idle"] is None
     assert not colors.colors_path().exists()  # nothing written until a change
@@ -35,7 +35,7 @@ def test_partial_update_persists_and_preserves_other_states(state_dir):
     colors.set_colors({"done": "#123ABC"})
     saved = json.loads(colors.colors_path().read_text(encoding="utf-8"))
     assert saved == {"schema_version": 1, "colors": {
-        "working": "#00AA55", "blocked": "#F07D9B", "done": "#123ABC", "error": "#D585E6",
+        "working": "#00AA55", "blocked": "#DC2626", "done": "#123ABC", "error": "#9333EA",
     }}
     assert resolve_color()[1] is None  # idle stays off
 
@@ -68,21 +68,15 @@ def test_invalid_input_rejected_without_changes(state_dir, state, value, message
 
 
 def test_theme_then_individual_override(state_dir):
-    assert colors.apply_theme("Classic") == colors.THEMES["classic"]
-    assert colors.theme_name(colors.load_colors()) == "classic"
+    assert colors.apply_theme("Calm") == colors.THEMES["calm"]
+    assert colors.theme_name(colors.load_colors()) == "calm"
     colors.set_colors({"blocked": "#FF0000"})
     effective = colors.load_colors()
     assert effective["blocked"] == "#FF0000"
     assert {s: effective[s] for s in ("working", "done", "error")} == {
-        s: colors.THEMES["classic"][s] for s in ("working", "done", "error")
+        s: colors.THEMES["calm"][s] for s in ("working", "done", "error")
     }
     assert colors.theme_name(effective) is None
-
-
-def test_calm_theme_name_still_applies_the_calm_default(state_dir):
-    colors.apply_theme("classic")
-    assert colors.apply_theme("calm") == colors.DEFAULT_COLORS
-    assert colors.theme_name(colors.load_colors()) == "default"  # same mapping
 
 
 def test_unknown_theme_rejected(state_dir):
@@ -92,9 +86,8 @@ def test_unknown_theme_rejected(state_dir):
 
 
 def test_themes_are_complete_valid_and_distinguishable():
-    assert list(colors.THEMES) == ["default", "calm", "classic", "warm", "cool"]
+    assert list(colors.THEMES) == ["default", "calm", "warm", "cool"]
     assert colors.THEMES["default"] == colors.DEFAULT_COLORS
-    assert colors.THEMES["calm"] == colors.DEFAULT_COLORS  # calm is the default
     for name, theme in colors.THEMES.items():
         assert colors.validate_mapping(theme) == theme, name
         hsv = {}
@@ -108,83 +101,9 @@ def test_themes_are_complete_valid_and_distinguishable():
             assert min(gap, 360 - gap) >= 25, (name, a, b)
     calm_sat = max(colorsys.rgb_to_hsv(*(c / 255 for c in colors.hex_to_rgb(v)))[1]
                    for v in colors.THEMES["calm"].values())
-    classic_sat = min(colorsys.rgb_to_hsv(*(c / 255 for c in colors.hex_to_rgb(v)))[1]
-                      for v in colors.THEMES["classic"].values())
-    assert calm_sat < classic_sat  # calm really is softer than the old vivid defaults
-
-
-def _hue_gap(a: float, b: float) -> float:
-    gap = abs(a - b) % 360
-    return min(gap, 360 - gap)
-
-
-# The Matter hue/saturation (0-254) each calm default sends. Brightness is not
-# part of this: the level comes only from `brightness_pct`.
-CALM_BULB_COMMANDS = {
-    "working": (120, 139),  # #5CCCB9 ocean teal,       169.8 deg, s 0.55
-    "blocked": (243, 122),  # #F07D9B dawn rose,        344.3 deg, s 0.48
-    "done": (172, 114),     # #8B84F0 night periwinkle, 243.9 deg, s 0.45
-    "error": (204, 107),    # #D585E6 night orchid,     289.5 deg, s 0.42
-}
-
-
-@pytest.mark.parametrize("theme", ["default", "calm", "classic"])
-def test_palette_stays_distinguishable_on_a_matter_bulb(theme):
-    # A Matter bulb renders only hue and saturation (moveToHueAndSaturation), so
-    # soft colors must still be far apart in hue and saturated enough not to wash
-    # out to white.
-    palette = colors.THEMES[theme]
-    hsv = {}
-    for state, value in palette.items():
-        r, g, b = (c / 255 for c in colors.hex_to_rgb(value))
-        hue, sat, _v = colorsys.rgb_to_hsv(r, g, b)
-        hsv[state] = (hue * 360, sat)
-        assert sat >= 0.35, (theme, state, sat)
-    for a, b in itertools.combinations(("working", "blocked", "done"), 2):
-        assert _hue_gap(hsv[a][0], hsv[b][0]) >= 60, (theme, a, b)
-    assert _hue_gap(hsv["error"][0], hsv["blocked"][0]) >= 30, theme
-
-
-def test_calm_defaults_keep_the_calm_chords_hues():
-    # Each default only deepens the saturation of a calm-chords tone; the hue is
-    # the source's (src/style.css, src/moods.ts).
-    sources = {
-        "working": "#A8FFF0",  # ocean screen
-        "blocked": "#F7B7C8",  # dawn sky rose
-        "done": "#C8C4FF",     # deep-night screen
-    }
-    for state, source in {**sources, "error": None}.items():
-        r, g, b = (c / 255 for c in colors.hex_to_rgb(colors.DEFAULT_COLORS[state]))
-        hue = colorsys.rgb_to_hsv(r, g, b)[0] * 360
-        if source is None:
-            target = 290  # deep-night chord hue
-        else:
-            target = colorsys.rgb_to_hsv(*(c / 255 for c in colors.hex_to_rgb(source)))[0] * 360
-        assert _hue_gap(hue, target) <= 1, (state, hue, target)
-
-
-def test_calm_defaults_send_expected_matter_hue_and_saturation():
-    class _Recorder:
-        def __init__(self):
-            self.sent = []
-
-        def command(self, command, args=None, timeout=10):
-            self.sent.append(args)
-
-    config = matter.MatterConfig(node_id=7, brightness_pct=40)
-    for state, expected in CALM_BULB_COMMANDS.items():
-        recorder = _Recorder()
-        matter.apply_color(recorder, config, colors.hex_to_rgb(colors.DEFAULT_COLORS[state]))
-        level = next(a["payload"] for a in recorder.sent if a["cluster_id"] == 8)
-        color = next(a["payload"] for a in recorder.sent if a["cluster_id"] == 768)
-        assert (color["hue"], color["saturation"]) == expected, state
-        assert color["saturation"] >= round(0.35 * 254)
-        assert level["level"] == matter.brightness_level(40)  # brightness unchanged
-    # The quantized hues the bulb receives keep the same separation.
-    hues = {s: h * 360 / 254 for s, (h, _sat) in CALM_BULB_COMMANDS.items()}
-    for a, b in itertools.combinations(("working", "blocked", "done"), 2):
-        assert _hue_gap(hues[a], hues[b]) >= 60, (a, b)
-    assert _hue_gap(hues["error"], hues["blocked"]) >= 30
+    default_sat = min(colorsys.rgb_to_hsv(*(c / 255 for c in colors.hex_to_rgb(v)))[1]
+                      for v in colors.THEMES["default"].values())
+    assert calm_sat < default_sat  # calm really is softer
 
 
 def test_export_import_round_trip_includes_overrides(state_dir):
@@ -263,7 +182,7 @@ def test_themes_and_imports_preserve_brightness_and_connection(state_dir):
 def test_cli_show_is_the_default(state_dir, capsys):
     assert cli.main(["config"]) == 0
     out = capsys.readouterr().out
-    assert "theme: default" in out and "#5CCCB9" in out and "idle     off" in out
+    assert "theme: default" in out and "#00C83C" in out and "idle     off" in out
     assert "brightness=100%" in out
 
 
