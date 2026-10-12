@@ -30,21 +30,14 @@ urgent state across every live agent session.
 
 | State | Default color | Meaning |
 |---|---|---|
-| `blocked` | dawn rose `#F07D9B` | An agent is waiting on you (permission prompt or question) |
-| `error` | night orchid `#D585E6` | A session failed |
-| `done` | night periwinkle `#8B84F0` | An agent finished its turn; your move |
-| `working` | ocean teal `#5CCCB9` | Agents are busy; leave them alone |
+| `blocked` | 🔴 red `#DC2626` | An agent is waiting on you (permission prompt or question) |
+| `error` | 🟣 violet `#9333EA` | A session failed |
+| `done` | 🔵 blue `#005AFF` | An agent finished its turn; your move |
+| `working` | 🟢 green `#00C83C` | Agents are busy; leave them alone |
 | `idle` | off | Nothing live |
 
 With several sessions, the highest priority wins: **`blocked > error > done > working > idle`**.
-If one agent is blocked while four others work, the bulb is rose.
-
-The default palette is the calm one, after the calm-chords project: each color keeps
-the hue of a calm-chords tone (ocean screen `#a8fff0`, dawn rose `#f7b7c8`, deep-night
-screen `#c8c4ff`, deep-night chord hue 290) with its saturation deepened just enough
-for a bulb. It is soft on screen but still reads clearly on a bulb; see
-[What the bulb receives](#what-the-bulb-receives). The original vivid
-green/red/blue/violet set is the `classic` theme.
+If one agent is blocked while four others work, the bulb is red.
 
 Highlights:
 
@@ -53,8 +46,8 @@ Highlights:
   hooks stay fast, and the bulb turns off by itself when sessions expire.
 - **Claude Code, Codex, and OpenCode** (1.x and 2.x, including OpenChamber), installed
   with one command each. Sub-agent sessions can't override their parent chat.
-- **Colors and themes:** change any state color, pick a built-in theme (default/calm,
-  classic, warm, cool), and share mappings as small JSON files.
+- **Colors and themes:** change any state color, pick a built-in theme (default, calm,
+  warm, cool), and share mappings as small JSON files.
 - **Constant brightness:** one brightness level for every state. State and theme changes
   only change the hue.
 
@@ -124,7 +117,7 @@ your bulb uses another). To select an existing node instead, run
 vibesignal matter-config --brightness 15
 ```
 
-**4. Check it.** This fakes a blocked agent, so the bulb should turn rose within a
+**4. Check it.** This fakes a blocked agent, so the bulb should turn red within a
 second, and off again after the clear:
 
 ```bash
@@ -187,7 +180,7 @@ and can't be assigned a color.
 
 ```bash
 vibesignal config --show
-vibesignal config --color working '#5CCCB9'
+vibesignal config --color working '#00C83C'
 vibesignal config --color blocked '#FF4400' --color done '#0088FF'   # several at once
 vibesignal config --reset-colors
 ```
@@ -202,44 +195,25 @@ so black would light up white.
 
 ```bash
 vibesignal config --list-themes
-vibesignal config --theme classic
+vibesignal config --theme calm
 vibesignal config --color error '#C026D3'   # individual overrides still work afterward
 ```
 
 A theme writes all four colors in one atomic update. `--show` reports the theme name
 while the mapping matches it exactly, and `custom` after an override.
 
-<p align="center"><img src="docs/themes.svg" alt="Theme preview: default (calm), classic, warm, and cool palettes for the working, blocked, done, and error states" width="720"></p>
+<p align="center"><img src="docs/themes.svg" alt="Theme preview: default, calm, warm, and cool palettes for the working, blocked, done, and error states" width="720"></p>
 
 | Theme | `working` | `blocked` | `done` | `error` |
 |---|---|---|---|---|
-| `default` / `calm` | `#5CCCB9` ocean teal | `#F07D9B` dawn rose | `#8B84F0` night periwinkle | `#D585E6` night orchid |
-| `classic` | `#00C83C` green | `#DC2626` red | `#005AFF` blue | `#9333EA` violet |
+| `default` | `#00C83C` green | `#DC2626` red | `#005AFF` blue | `#9333EA` violet |
+| `calm` | `#6DBE8C` sage | `#E07A72` coral | `#6F9EE0` soft blue | `#A88BDB` lavender |
 | `warm` | `#E8C000` gold | `#DB1F4A` rose red | `#F2661B` orange | `#A3179E` magenta |
 | `cool` | `#14B8A6` teal | `#EC4899` pink | `#3B82F6` blue | `#8B5CF6` indigo |
 
-`calm` is the same mapping as `default` (so `--show` reports it as `default`), and
-`classic` holds the vivid colors that were the default before. In every theme, the four
-states are at least 25° apart in hue and keep enough saturation to read as distinct
-colors on a bulb. `warm` is the tightest, because gold and orange sit close together.
-
-### What the bulb receives
-
-A Matter bulb takes only hue and saturation from a color (`moveToHueAndSaturation`,
-both 0-254). The level comes only from `--brightness`, so a theme never changes
-brightness. The calm default keeps `working`, `blocked`, and `done` at least 60° apart
-in hue, `error` at least 30° from `blocked`, and every saturation at 0.35 or above, so
-the bulb never washes out to white. A unit test enforces these limits.
-
-| State | Old default (now `classic`) | Bulb hue / sat | New default (calm) | Bulb hue / sat |
-|---|---|---|---|---|
-| `working` | `#00C83C` green (138°) | 97 / 254 | `#5CCCB9` ocean teal (170°) | 120 / 139 |
-| `blocked` | `#DC2626` red (0°) | 0 / 210 | `#F07D9B` dawn rose (344°) | 243 / 122 |
-| `done` | `#005AFF` blue (219°) | 154 / 254 | `#8B84F0` night periwinkle (244°) | 172 / 114 |
-| `error` | `#9333EA` violet (271°) | 192 / 199 | `#D585E6` night orchid (290°) | 204 / 107 |
-
-Lower saturation makes the bulb look softer, closer to pastel. If your bulb renders the
-calm colors too pale, `vibesignal config --theme classic` restores the vivid set.
+In every theme, the four states are at least 25° apart in hue and keep enough
+saturation to read as distinct colors on a bulb. `warm` is the tightest, because gold
+and orange sit close together.
 
 ### Import and export
 
@@ -254,10 +228,10 @@ Exports contain the effective colors, including individual overrides:
 {
   "schema_version": 1,
   "colors": {
-    "working": "#5CCCB9",
-    "blocked": "#F07D9B",
-    "done": "#8B84F0",
-    "error": "#D585E6"
+    "working": "#00C83C",
+    "blocked": "#DC2626",
+    "done": "#005AFF",
+    "error": "#9333EA"
   }
 }
 ```
@@ -331,10 +305,7 @@ Everything from upstream VibeSignal still works in this fork and follows the sam
 - **USB busylights** supported by [`busylight-core`](https://pypi.org/project/busylight-core/)
   (for example Luxafor Flag or blink(1)) are set directly by every hook event.
 - **On-screen widget:** `vibesignal widget &` (add the `macos` extra on macOS), plus
-  `install-launcher` and `install-autostart`. A small deep-night card with a rounded
-  status screen; when an agent needs you, the whole card takes the `blocked` color.
-  A static mockup of the working, needs-you, and done states is in
-  [`docs/widget-mockup.html`](docs/widget-mockup.html).
+  `install-launcher` and `install-autostart`.
 - **Terminal panel:** `vibesignal watch`.
 
 They aren't the focus here and haven't been re-tested in this fork. If you don't have a

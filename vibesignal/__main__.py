@@ -485,7 +485,7 @@ def main(argv: list | None = None) -> int:
     config_action.add_argument("--show", action="store_true", help="print effective colors and Matter settings")
     config_action.add_argument(
         "--color", nargs=2, action="append", metavar=("STATE", "HEX"),
-        help="set one state color, e.g. --color working '#5CCCB9' (repeatable)",
+        help="set one state color, e.g. --color working '#00C83C' (repeatable)",
     )
     config_action.add_argument("--theme", metavar="NAME", help="apply a built-in theme to all four states")
     config_action.add_argument("--list-themes", action="store_true", help="list built-in themes")

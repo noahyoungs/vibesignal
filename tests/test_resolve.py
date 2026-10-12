@@ -54,8 +54,8 @@ def test_colors_cover_all_states():
     for s in (State.WORKING, State.BLOCKED, State.DONE, State.ERROR, State.IDLE):
         assert s in rgb
     assert rgb[State.IDLE] is None
-    assert rgb[State.BLOCKED] == [240, 125, 155]
-    assert rgb[State.DONE] == [139, 132, 240]
+    assert rgb[State.BLOCKED] == [220, 38, 38]
+    assert rgb[State.DONE] == [0, 90, 255]
 
 
 def test_configurable_states_are_exactly_the_active_priority_states():
@@ -90,7 +90,7 @@ def test_per_session_orders_blocked_first(tmp_path, monkeypatch):
     rows = resolve_per_session(ttl=600, now=1050.0)  # within the done window
     assert [r["state"] for r in rows] == ["blocked", "done", "working"]
     assert rows[0]["project"] == "p2"
-    assert rows[0]["color"] == [240, 125, 155]
+    assert rows[0]["color"] == [220, 38, 38]
 
 
 def test_per_session_normalizes_needs_input(tmp_path, monkeypatch):
@@ -162,8 +162,8 @@ def test_blocked_persists_past_store_ttl(tmp_path, monkeypatch):
     later = 1000.0 + store.DEFAULT_TTL_SECONDS + 60  # ~11 min, well past the store TTL
     rows = resolve_per_session(now=later)
     assert [r["state"] for r in rows] == ["blocked"]
-    # The single light also stays blocked-colored, not off.
-    assert resolve_color(now=later) == ("blocked", [240, 125, 155])
+    # The single light also stays amber, not off.
+    assert resolve_color(now=later) == ("blocked", [220, 38, 38])
 
 
 def test_blocked_clears_after_backstop(tmp_path, monkeypatch):

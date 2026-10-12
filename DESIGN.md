@@ -41,13 +41,13 @@ v1 mapped both `Notification` and `Stop` to one `needs_input` state. v2 split th
 
 | State | Color | Set by (Claude Code hook) | Meaning |
 |-------|-------|---------------------------|---------|
-| `working` | ocean teal | UserPromptSubmit, PostToolUse | running; leave alone |
-| `blocked` | dawn rose | Notification (`permission_prompt`) | needs you now (permission / question) |
-| `done` | night periwinkle | Stop, StopFailure, Notification (`idle_prompt`) | finished the turn; your move |
-| `error` | night orchid | (manual; OpenCode `session.error`) | failure |
-| `idle` | off (muted grey in the widget) | TTL timeout | nothing pending |
+| `working` | green | UserPromptSubmit, PostToolUse | running; leave alone |
+| `blocked` | red | Notification (`permission_prompt`) | needs you now (permission / question) |
+| `done` | blue | Stop, StopFailure, Notification (`idle_prompt`) | finished the turn; your move |
+| `error` | violet | (manual; OpenCode `session.error`) | failure |
+| `idle` | off (grey in the widget) | TTL timeout | nothing pending |
 
-The colors above are the calm defaults (`working #5CCCB9`, `blocked #F07D9B`, `done #8B84F0`, `error #D585E6`); they are user-configurable, see Configurable Colors. Until the calm palette, the defaults were vivid green/red/blue/violet (`#00C83C`, `#DC2626`, `#005AFF`, `#9333EA`), now the `classic` theme. Earlier upstream drafts used amber for `blocked` and red for `error`.
+The colors above are the defaults (`working #00C83C`, `blocked #DC2626`, `done #005AFF`, `error #9333EA`); they are user-configurable, see Configurable Colors. Earlier upstream drafts used amber for `blocked` and red for `error`.
 
 The `Notification` hook fires for more than one situation, so v3 splits it by matcher: a `permission_prompt` is `blocked` (act now), while an `idle_prompt` (the turn ended and is waiting on you) is `done`. A flat `Notification` to `blocked` produced false "blocked" on idle prompts, which is why the matcher split matters. `StopFailure` (a turn that ends on an API error) also maps to `done`: the turn is over, so the session is no longer working.
 
@@ -66,7 +66,7 @@ Backward compatibility: `needs_input` is kept as an accepted alias for `blocked`
 - `store.py`: unchanged. Already per-session, agent-tagged, atomic, TTL-bounded, malformed-file tolerant.
 - `resolve.py`: `BLOCKED` and `DONE` states and their colors; `needs_input` maps to `blocked`; aggregate priority; `resolve_per_session(ttl)` returns rows `{agent, project, session, state, color, ts}`, sorted blocked-first; renderers compute display age from `ts`. v3 adds the per-state lifetime (`_STATE_TTL_SECONDS`, `_expired`): `working` 10 min, `done` 90 s, `error` 5 min, `blocked` an 8 h backstop, applied by both `resolve_color()` and `resolve_per_session()`. Colors are not defined here; they come from `colors.py`.
 - `panel.py`: `render(rows, now) -> str` formats rows into a colored table (testable without a terminal); `watch()` reads the store, calls `render`, reprints about once a second, and exits cleanly on Ctrl-C.
-- `widget.py` (v3, new): an always-on-top Tkinter window (standard library only) that renders `resolve_per_session()` as a small floating panel, one row per session, blocked first. A third renderer over the same primitive, so it adds no hook-layer or store change. Borderless, drag by the header, right-click to quit, pinned bottom-left of the work area. The fork restyles it in the calm palette: a deep-night card with a small rounded status screen (a soft dot plus the aggregate state, such as "needs you") above the rows. When the aggregate is `blocked` or `error`, the frame and header take that color, and the header text switches between white and dark ink, whichever contrasts more. Every state color still comes from the configured mapping.
+- `widget.py` (v3, new): an always-on-top Tkinter window (standard library only) that renders `resolve_per_session()` as a small floating panel, one row per session, blocked first. A third renderer over the same primitive, so it adds no hook-layer or store change. Borderless, drag by the header, right-click to quit, pinned bottom-left of the work area.
 - `__main__.py`: `watch`, `widget`, and `end` subcommands; `event --state` choices include `blocked` and `done` (with `needs_input` as an alias). `end` clears one session by id from hook stdin, and no-ops when no id is present so it cannot wipe the `default` bucket.
 - `light.py`: unchanged (still driven by the `resolve_color` color).
 - `hooks/claude-settings.snippet.json`: the deployed model. UserPromptSubmit and PostToolUse to `working`; `Notification` split (`permission_prompt` to `blocked`, `idle_prompt` to `done`); `Stop` and `StopFailure` to `done`; `SessionEnd` to `end`.
@@ -104,19 +104,6 @@ Rendering is one constant brightness: `moveToLevelWithOnOff` with the level from
 `colors.py` is the single source of truth for state colors. The USB light, the widget, and the Matter worker all get colors through `resolve_color()` / `resolve_per_session()`, which read the mapping on every call; the terminal panel keeps fixed basic ANSI colors approximating the defaults. Only the four active states are configurable; `idle` is always off, and black is rejected because a bulb would render it as white. State validity, priority, aliases, and lifetimes stay in `resolve.py` and do not depend on the mapping.
 
 The saved file `~/.vibesignal/colors.json` uses the same versioned document as export (`{"schema_version": 1, "colors": {...}}`). Writers validate the complete mapping before an atomic replace, so a rejected command, theme, or import changes nothing; readers are tolerant and fall back to defaults per state, so a hand-edited file can never crash a hook or the worker. Themes and imports touch only `colors.json`, so brightness and Matter connection settings in `matter.json` are untouched.
-
-### Calm default palette
-
-The default palette is calm, after the calm-chords project (`src/style.css`, `src/moods.ts`), so the on-screen widget is soft and unintimidating. Each state color keeps the hue of a calm-chords tone and only deepens its saturation: `working` from the ocean screen `#a8fff0` (170°), `blocked` from the dawn sky rose `#f7b7c8` (344°), `done` from the deep-night screen `#c8c4ff` (244°; the dawn periwinkle `#9fc3ef` at 213° would sit only 43° from `working`), and `error` from the deep-night chord hue 290. The widget chrome uses the deep-night mood directly: body `#23264a`/`#3a3f6e` for the card and border, sky `#101a3a`/`#2c2560` for the inset screen, ink `#dfe3ff` for text, and the dawn ink `#3b2f4a` for dark text on a pastel alarm header. A bulb still has to tell the states apart from across a room, and it sees only hue and saturation. The default therefore keeps `working`, `blocked`, and `done` pairwise at least 60° apart in hue, `error` at least 30° from `blocked`, and every HSV saturation at 0.35 or above, so nothing washes out to white. `tests/test_colors.py` enforces these limits and the exact Matter values below. Brightness is unchanged: the level still comes only from `brightness_pct`.
-
-| State | Old hex | Old hue / sat (0-254) | New hex | New hue / sat (0-254) |
-|-------|---------|-----------------------|---------|-----------------------|
-| `working` | `#00C83C` | 97 / 254 | `#5CCCB9` | 120 / 139 |
-| `blocked` | `#DC2626` | 0 / 210 | `#F07D9B` | 243 / 122 |
-| `done` | `#005AFF` | 154 / 254 | `#8B84F0` | 172 / 114 |
-| `error` | `#9333EA` | 192 / 199 | `#D585E6` | 204 / 107 |
-
-The `calm` theme name is kept as an alias of `default`, so existing `--theme calm` commands keep working. The previous vivid defaults remain available as `classic`. A saved `colors.json` (including any user override) still wins over the defaults; only users who never changed their colors see the new palette. The terminal panel's fixed 16-color ANSI approximation follows suit: cyan, bright red, bright blue, and bright magenta.
 
 ## Error Handling
 
