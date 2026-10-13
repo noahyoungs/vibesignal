@@ -21,6 +21,12 @@ Claude Code, Codex, and OpenCode.**
 > [upstream VibeSignal](https://github.com/yzhao062/vibesignal). This fork keeps that
 > support too (see [Other displays](#other-displays)).
 
+<p align="center">
+  <img src="docs/matter-light-demo.jpg" alt="VibeSignal demo: Codex working on screen above a desk light glowing green" width="360">
+  <br>
+  <em>Green means the agent is working. Frame from the recorded demo.</em>
+</p>
+
 ## What it does
 
 When you run several coding agents at once, the one that needs you is usually in a
