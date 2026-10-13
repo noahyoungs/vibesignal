@@ -110,7 +110,10 @@ other color-control modes may need additional implementation work.
 
 - **Matter over Wi-Fi:** this is the tested path. The light and Mac must be reachable
   on the same local network, and the light must be commissioned into VibeSignal's
-  Matter fabric using the sharing-code flow below.
+  Matter fabric using the sharing-code flow below. **The Mac running VibeSignal must
+  remain connected to that LAN for the light to receive status updates.** If you take
+  the Mac away, disconnect it, or switch to a different network, updates cannot reach
+  the light. This setup does not provide remote control through a cloud relay.
 - **Matter over Thread:** you need a **Thread border router**, often built into a
   compatible smart-home hub, to connect the Thread light to your LAN. You may also
   need additional Thread-network, commissioning, IPv6, or discovery configuration.
@@ -377,6 +380,9 @@ Reports are welcome.
 
 This is an experimental personal project shared for feedback:
 
+- The Mac running VibeSignal must stay on the Matter light’s LAN. Taking the Mac
+  away or switching networks interrupts light updates; the light may retain its last
+  state until it can be reached again.
 - Matter autostart is macOS-only (launchd). The Matter path is tested with one bulb
   model.
 - The worker doesn't notice when the bulb is power-cycled or changed from another app
