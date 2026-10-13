@@ -10,7 +10,7 @@ Claude Code, Codex, and OpenCode.**
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
 [![Status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#limitations)
 
-[What it does](#what-it-does) · [Install](#install) · [Set up the bulb](#set-up-the-bulb) · [Connect your agents](#connect-your-agents) · [Colors & themes](#colors-themes-and-brightness) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
+[What it does](#what-it-does) · [Install](#install) · [Hardware](#hardware) · [Set up the bulb](#set-up-the-bulb) · [Connect your agents](#connect-your-agents) · [Colors & themes](#colors-themes-and-brightness) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
 
 </div>
 
@@ -41,7 +41,7 @@ If one agent is blocked while four others work, the bulb is red.
 
 Highlights:
 
-- **Any Matter color bulb**, driven through a local [matter.js Matter Server](https://github.com/matter-js/matterjs-server)
+- **Any compatible Matter color light**, driven through a local [matter.js Matter Server](https://github.com/matter-js/matterjs-server)
   (pinned in `matter-server/package.json`). One small worker owns the bulb, so agent
   hooks stay fast, and the bulb turns off by itself when sessions expire.
 - **Claude Code, Codex, and OpenCode** (1.x and 2.x, including OpenChamber), installed
@@ -82,10 +82,45 @@ is installed in the same environment, `pip uninstall vibesignal` first.
 The commands below write `vibesignal`; use `.venv/bin/vibesignal` if the venv isn't
 activated.
 
+## Hardware
+
+**I have only tested this with a Matter-over-Wi-Fi device:** the Linkind ST19
+color bulb below, first commissioned in Apple Home. Thread devices, light strips,
+and other light models have not been tested with this fork yet.
+
+### My desk setup
+
+| Item | What I bought | Amazon US price checked October 13, 2026 |
+|---|---|---|
+| Smart bulb | [Linkind ST19 Matter Smart Edison color bulb, E26, 1-pack](https://www.amazon.com/dp/B0FWHPBQF6) — Matter over 2.4 GHz Wi-Fi | $28.99 |
+| Stand | [Vohyzufa black E26/E27 table lamp base with switch, 1-pack](https://www.amazon.com/dp/B0FYH55GBW) | From $9.39 |
+
+These are the bulb and stand I bought, not required hardware. Prices are in USD
+and can change with the seller, delivery location, promotions, tax, and shipping.
+The stand is simply a powered bulb holder; it is not a smart-home hub.
+
+### Other Matter lights
+
+You do not need the bulb above. This should work with any Matter color light that
+exposes the standard **On/Off, Level Control, and Color Control (hue/saturation)**
+clusters, including color light strips, lamps, and other lighting fixtures. Select
+the appropriate endpoint with `vibesignal matter-config --node <id> --endpoint <n>`.
+White-only lights cannot display the status colors, and devices that support only
+other color-control modes may need additional implementation work.
+
+- **Matter over Wi-Fi:** this is the tested path. The light and Mac must be reachable
+  on the same local network, and the light must be commissioned into VibeSignal's
+  Matter fabric using the sharing-code flow below.
+- **Matter over Thread:** you need a **Thread border router**, often built into a
+  compatible smart-home hub, to connect the Thread light to your LAN. You may also
+  need additional Thread-network, commissioning, IPv6, or discovery configuration.
+  This setup has not been tested here. See the [Thread Group's explanation of border
+  routers](https://threadgroup.org/Newsroom/Blog/what-is-a-thread-border-router-and-how-is-it-different-from-a-hub-or-a-bridge).
+
 ## Set up the bulb
 
-You need a Matter-over-Wi-Fi color bulb, the Mac and bulb on the same LAN/subnet
-(Matter discovery is link-local), and an existing Matter controller (for example Apple
+The tested setup uses a Matter-over-Wi-Fi color light, the Mac and light on the same
+LAN/subnet (Matter discovery is link-local), and an existing Matter controller (for example Apple
 Home) to provide a sharing code.
 
 **1. Start the services.** This installs two launchd agents: the Matter Server (local
@@ -320,8 +355,10 @@ them in full and is the better starting point.
 | Matter host | macOS with launchd, Node.js 22, `matter-server` 1.4.0 |
 | Agents | Claude Code 2.1, Codex 0.151, OpenCode 1.18 and 2.0.18 (bundled by OpenChamber) |
 
-Other Matter color bulbs should work if they expose the standard On/Off, Level Control,
-and Color Control (hue/saturation) clusters. Reports are welcome.
+Other Matter color lights, including light strips and lamps, should work if they expose
+the standard On/Off, Level Control, and Color Control (hue/saturation) clusters. Only
+the Wi-Fi bulb above has been tested; see [Hardware](#hardware) for Thread requirements.
+Reports are welcome.
 
 ## Troubleshooting
 
